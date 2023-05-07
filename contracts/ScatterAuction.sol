@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
-// REMILIA COLLECTIVE
 // ETYMOLOGY: Zora Auction House -> Noun Auction House -> Bonkler Auction -> Scatter Auction
 
 pragma solidity ^0.8.4;
 
 import "solady/src/utils/SafeTransferLib.sol";
 import "solady/src/utils/SafeCastLib.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract ScatterAuction is OwnableUpgradeable {
+contract ScatterAuction is Ownable {
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                           EVENTS                           */
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
@@ -40,22 +39,22 @@ contract ScatterAuction is OwnableUpgradeable {
      * - `uint40` is enough to represent timestamps up to year 36811 A.D.
      */
     struct AuctionData {
-	    // The address of the current highest bid.
+        // The address of the current highest bid.
         address bidder;
-		// The current highest bid amount.
+        // The current highest bid amount.
         uint96 amount;
-		// The start time of the auction.
+        // The start time of the auction.
         uint40 startTime;
-		// The end time of the auction.
+        // The end time of the auction.
         uint40 endTime;
-		// ERC721 token ID. Starts from 0.
+        // ERC721 token ID. Starts from 0.
         uint24 nftId;
-		// ERC721 max supply.
+        // ERC721 max supply.
         uint24 maxSupply;
         // Whether or not the auction has been settled.
         bool settled;
         // The ERC721 token contract.
-		// TODO refactor to "token"
+        // TODO refactor to "token"
         address nftContract;
         // The minimum price accepted in an auction.
         uint96 reservePrice;
@@ -75,6 +74,7 @@ contract ScatterAuction is OwnableUpgradeable {
      */
     AuctionData internal _auctionData;
 
+    
     /**
      * @dev The address that deployed the contract.
      */
@@ -94,25 +94,23 @@ contract ScatterAuction is OwnableUpgradeable {
 
     function initialize(
         address nftContract,
-		uint24 maxSupply,
+        uint24 maxSupply,
         uint96 reservePrice,
         uint96 bidIncrement,
         uint32 duration,
         uint32 timeBuffer
-    ) external payable initializer {
+    ) external payable {
         require(_deployer == msg.sender, "Only the deployer can call.");
         require(nftContract != address(0), "The nft token address can't be 0");
         require(_auctionData.nftContract == address(0), "Already initialized.");
-		require(maxSupply > 0, "The token supply can't be 0");
-
-        __Ownable_init();
+        require(maxSupply > 0, "The token supply can't be 0");
 
         _checkReservePrice(reservePrice);
         _checkBidIncrement(bidIncrement);
         _checkDuration(duration);
 
         _auctionData.nftContract = nftContract;
-		_auctionData.maxSupply = maxSupply;
+        _auctionData.maxSupply = maxSupply;
 
         _auctionData.reservePrice = reservePrice;
         _auctionData.bidIncrement = bidIncrement;
@@ -322,13 +320,13 @@ contract ScatterAuction is OwnableUpgradeable {
      */
     function _createAuction() internal returns (bool) {
         uint256 nftId = uint256(_auctionData.nftId) + 1;
-	
+    
         if (nftId > _auctionData.maxSupply) return false;
 
         nftId = IAuctionedNFT(_auctionData.nftContract).mint();
-	
+    
         uint256 endTime = block.timestamp + _auctionData.duration;
-		
+        
         _auctionData.bidder = address(1);
         _auctionData.amount = 0;
         _auctionData.startTime = SafeCastLib.toUint40(block.timestamp);
@@ -350,10 +348,10 @@ contract ScatterAuction is OwnableUpgradeable {
         uint256 nftId = _auctionData.nftId;
         address nftContract = _auctionData.nftContract;
 
-		payable(nftContract).transfer(amount);
+        payable(nftContract).transfer(amount);
         IAuctionedNFT(nftContract).safeTransferFrom(
-			address(this), bidder, nftId
-		);
+            address(this), bidder, nftId
+        );
 
         _auctionData.settled = true;
 
