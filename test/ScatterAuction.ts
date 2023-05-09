@@ -7,7 +7,7 @@ import {
     ScatterAuction,
     ScatterAuction__factory 
 } from '../typechain-types';
-import { BigNumber } from 'ethers';
+import { BigNumber, Contract } from 'ethers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 
 // Helpers, TODO, should get decoupled
@@ -64,6 +64,9 @@ const getNextId = async (auction: ScatterAuction): Promise<number> => {
 const getLastTimestamp = async () =>
     (await ethers.provider.getBlock('latest')).timestamp
 
+const getContractBalance = async (contract: Contract): Promise<BigNumber> =>
+    await ethers.provider.getBalance(contract.address)
+
 const auctionFactory = async ({
     maxSupply = 1000,
     reservePrice = 0.1,
@@ -71,19 +74,23 @@ const auctionFactory = async ({
     auctionDuration = 3 * 60 * 60, // 3 hours
     extraBidTime = 5 * 60, // 5 mins
     auctionType = 'ScatterAuction',
-    bidToken = undefined
+    useBidToken = false,
 }) => {
     const AuctionFactory = await ethers.getContractFactory(auctionType);
     const NftFactory = await ethers.getContractFactory('MinimalAuctionableNFT')
+    const TestErc20Factory = await ethers.getContractFactory('TestToken')
+
+    const [deployer, ] = await ethers.getSigners()
     
-    const nft: MinimalAuctionableNFT = await NftFactory.deploy("TestNft", "TEST")
-    const auction: ScatterAuction = await AuctionFactory.deploy() as ScatterAuction
+    const nft = await NftFactory.deploy('TestNft', 'TEST')
+    const auction = await AuctionFactory.deploy() as ScatterAuction
+    const bidToken = await TestErc20Factory.connect(deployer).deploy()
     
     await nft.deployed()
     await auction.deployed()
     
     await auction.initialize(
-        bidToken === undefined ? ethers.constants.AddressZero : bidToken,
+        useBidToken ? bidToken.address : ethers.constants.AddressZero,
         nft.address,
         maxSupply,
         toWei(reservePrice),
@@ -94,21 +101,10 @@ const auctionFactory = async ({
 
     await nft.setMinter(auction.address)
 
-    return { auction, nft }
+    return { auction, nft, bidToken }
 }
 
 describe('ScatterAuction', () => {
-
-    let ScatterAuction: ScatterAuction__factory;
-    let NftFactory: MinimalAuctionableNFT__factory;
-    let scatterAuction: ScatterAuction;
-    let minimalNft: MinimalAuctionableNFT;
-
-    before(async () => {
-        const { auction, nft } = await auctionFactory({})
-        scatterAuction = auction
-        minimalNft = nft
-    })
 
     it('should have parameters correctly initialized', async () => {
         const { auction, nft } = await auctionFactory({maxSupply: 420})
@@ -123,7 +119,7 @@ describe('ScatterAuction', () => {
     })
     
     it('should allow bidding on valid ids', async () => {
-        const { auction, } = await auctionFactory({reservePrice: 0.01, bidIncrement: 0.01})
+        const { auction } = await auctionFactory({reservePrice: 0.01, bidIncrement: 0.01})
         const [_, bidder] = await ethers.getSigners();
 
         const mkbid = (i: number) => 
@@ -134,7 +130,7 @@ describe('ScatterAuction', () => {
     })
 
     it('shouldn\'t allow bidding on non initialized ids', async () => {
-        const { auction, } = await auctionFactory({reservePrice: 0.01, bidIncrement: 0.01})
+        const { auction } = await auctionFactory({reservePrice: 0.01, bidIncrement: 0.01})
         const maxSupply = await getparam('maxSupply', auction) as number
         const idsToTest = [0, 1, 2, maxSupply , 1231231231, 1]
         const shouldAllowBidding = idsToTest.map(id => id == 1)
@@ -149,12 +145,82 @@ describe('ScatterAuction', () => {
             else await expect(mkbid(idsToTest[i])).to.be.reverted
     })
 
-    /*
     it('should allow bids with ERC20 tokens', async () => {
-        // TODO
-        expect(0).to.equal(1);
+        const { auction, nft, bidToken } = await auctionFactory({
+            reservePrice: 10, bidIncrement: 5, useBidToken: true, 
+            auctionDuration: 5, extraBidTime: 0
+        })
+        const [owner, bidder1, bidder2] = await ethers.getSigners()
+        bidToken.connect(owner).transfer(bidder1.address, toWei(50))
+        bidToken.connect(owner).transfer(bidder2.address, toWei(50))
+
+        expect(auction.connect(bidder1).createBid(1, toWei(10))).to.be.reverted
+
+        await bidToken.connect(bidder1).approve(auction.address, toWei(50))
+        await bidToken.connect(bidder2).approve(auction.address, toWei(50))
+
+        await auction.connect(bidder1).createBid(1, toWei(10))
+        expect(auction.connect(bidder2).createBid(1, toWei(14.9))).to.be.reverted
+        await auction.connect(bidder2).createBid(1, toWei(15))
+
+        await sleep(5)
+
+        await auction.connect(bidder1).createBid(2, toWei(20))
+        
+        expect(await bidToken.balanceOf(auction.address)).to.equal(toWei(20))
+        expect(await bidToken.balanceOf(nft.address)).to.equal(toWei(15))
+        expect(await bidToken.balanceOf(bidder1.address)).to.equal(toWei(50 - 20))
+        expect(await bidToken.balanceOf(bidder2.address)).to.equal(toWei(50 - 15))
+    
+        expect(await getContractBalance(bidToken)).to.equal(0)
+        expect(await getContractBalance(auction)).to.equal(0)
+        expect(await getContractBalance(nft)).to.equal(0)
     })
-    */
+
+    it('should be able to withdraw eth', async () => {
+        const { auction, nft } = await auctionFactory({
+            reservePrice: 0.01, bidIncrement: 0.01, auctionDuration: 3, extraBidTime: 0
+        })
+
+        const [owner, bidder] = await ethers.getSigners()
+
+        await auction.connect(bidder).createBid(1, 0, {value: toWei(0.01)})
+        await sleep(3)
+        await auction.settleAuction()
+        
+        const iniBal = await owner.getBalance()
+        await nft.connect(owner)['withdraw()']()
+        expect(await owner.getBalance()).to.be.approximately(
+            iniBal.add(toWei(0.01)), toWei(0.0001)
+        )
+    })
+
+    it('should be able to withdraw erc20', async () => {
+        const { auction, nft, bidToken } = await auctionFactory({
+            reservePrice: 10, auctionDuration: 3, extraBidTime: 0, useBidToken: true
+        })
+
+        const [owner, bidder] = await ethers.getSigners()
+        bidToken.connect(owner).transfer(bidder.address, toWei(50))
+
+        await bidToken.connect(bidder).approve(auction.address, toWei(10))
+        await auction.connect(bidder).createBid(1, toWei(10))
+
+        await sleep(3)
+        await auction.settleAuction()
+        
+        const iniBal = await owner.getBalance()
+        const iniTokensBal = await bidToken.balanceOf(owner.address)
+        
+        expect(await getContractBalance(nft)).to.equal(0)
+        expect(await getContractBalance(auction)).to.equal(0)
+
+        await nft.connect(owner)['withdraw(address)'](bidToken.address)
+        await nft.connect(owner)['withdraw()']()
+
+        expect(await owner.getBalance()).to.approximately(iniBal, toWei(0.001))
+        expect(await bidToken.balanceOf(owner.address)).to.equal(iniTokensBal.add(toWei(10)))
+    })
 
     // Epic smoke test.
     it('should allow functional bidding and mint out', async () => {
@@ -183,10 +249,10 @@ describe('ScatterAuction', () => {
         expect(mkbid(bidder3, 6, 1)).to.be.reverted
         
         // Bid should have finished at this point.
-        expect(mkbid(bidder3, 1, 0.035))
+        expect(mkbid(bidder3, 1, 0.035)).to.be.reverted
 
         expect(mkbid(bidder2, 1, 1)).to.be.reverted
-    
+        
         // Even if `auctionDuration` was exceded, `bidder2` should be able
         // to keep bidding because of `extraBidTime`.
         for (let i = 0.1; i < 0.15; i += 0.005) {

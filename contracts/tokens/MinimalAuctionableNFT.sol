@@ -4,6 +4,7 @@ pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract MinimalAuctionableNFT is ERC721, Ownable {
 
@@ -35,5 +36,9 @@ contract MinimalAuctionableNFT is ERC721, Ownable {
 
 	function withdraw() external onlyOwner {
 		payable(msg.sender).transfer(address(this).balance);
+	}
+
+	function withdraw(address token) external onlyOwner {
+        IERC20(token).transfer(msg.sender, IERC20(token).balanceOf(address(this)));
 	}
 }
