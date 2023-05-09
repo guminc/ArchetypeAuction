@@ -3,9 +3,9 @@
 pragma solidity ^0.8.4;
 
 import "./ScatterAuction.sol";
-import "./IHoldsShares.sol";
+import "./ISharesHolder.sol";
 
-contract RewardedAuction is ScatterAuction, IHoldsShares {
+contract RewardedAuction is ScatterAuction, ISharesHolder {
 
 	/**
      * @dev Amount of eth bidded by an address.

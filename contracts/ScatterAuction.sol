@@ -296,18 +296,6 @@ contract ScatterAuction is Ownable {
         _auctionData.timeBuffer = timeBuffer;
         emit AuctionTimeBufferUpdated(timeBuffer);
     }
-    
-    /**
-     * @dev Set a new token to use for bids.
-     */
-    function setBidToken(address bidToken) external onlyOwner {
-        // The auction for the current token must have ended so you dont need to 
-        // implement a price oracle between the last token and the new `bidToken`.
-        require(block.timestamp >= _auctionData.endTime, "Auction still ongoing.");
-        _auctionData.bidToken = bidToken;
-        _auctionData.isEthAuction = bidToken == address(0);
-        emit AuctionBidTokenUpdated(bidToken);
-    }
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                 INTERNAL / PRIVATE HELPERS                 */
