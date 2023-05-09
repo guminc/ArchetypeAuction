@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.4;
 
-interface IHoldsShares {
+interface ISharesHolder {
 
 	/**
 	 * @param updater Should be an IRewardClaimer.
