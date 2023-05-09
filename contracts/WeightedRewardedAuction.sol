@@ -54,8 +54,8 @@ contract WeightedRewardedAuction is ScatterAuction {
 	bytes32 public rewardableTokensHeldPerWalletRoot;
 
 
-    function createBid(uint256 nftId) override public payable {
-		super.createBid(nftId);
+    function createBid(uint256 nftId, uint96 amount) override public payable {
+		super.createBid(nftId, amount);
 		_rewardTokenShares[msg.sender] += msg.value;
 	}
 

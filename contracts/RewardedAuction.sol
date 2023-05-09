@@ -13,8 +13,8 @@ contract RewardedAuction is ScatterAuction, IHoldsShares {
     mapping(address => uint256) private _rewardTokenShares;
 	mapping(address => bool) private _allowSharesUpdate;
 
-    function createBid(uint256 nftId) override public payable {
-		super.createBid(nftId);
+    function createBid(uint256 nftId, uint96 amount) override public payable {
+		super.createBid(nftId, amount);
 		_rewardTokenShares[msg.sender] += msg.value;
 	}
 	

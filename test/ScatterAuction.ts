@@ -22,19 +22,20 @@ const sleep = (s: number) => new Promise(resolve => setTimeout(resolve, s*1000))
 
 const fromParamToAuctionIndex: any = {
     "bidder": 0,
-    "amount": 1,
-    "startTime": 2,
-    "endTime": 3,
-    "nftId": 4,
-    "maxSupply": 5,
-    "settled": 6,
-    "nftContract": 7,
-    "reservePrice": 8,
-    "bidIncrement": 9,
-    "duration": 10,
-    "timeBuffer": 11,
-    "nftContractBalance": 12,
-    "rewardToken": 13
+    "bidToken": 1,
+    "amount": 2,
+    "isEthAuction": 3,
+    "startTime": 4,
+    "endTime": 5,
+    "nftId": 6,
+    "maxSupply": 7,
+    "settled": 8,
+    "nftContract": 9,
+    "reservePrice": 10,
+    "bidIncrement": 11,
+    "duration": 12,
+    "timeBuffer": 13,
+    "nftContractBalance": 14
 }
 
 const getparam = async (param: string, auction: ScatterAuction) => {
@@ -69,7 +70,8 @@ const auctionFactory = async ({
     bidIncrement = 0.05,
     auctionDuration = 3 * 60 * 60, // 3 hours
     extraBidTime = 5 * 60, // 5 mins
-    auctionType = 'ScatterAuction'
+    auctionType = 'ScatterAuction',
+    bidToken = undefined
 }) => {
     const AuctionFactory = await ethers.getContractFactory(auctionType);
     const NftFactory = await ethers.getContractFactory('MinimalAuctionableNFT')
@@ -79,8 +81,9 @@ const auctionFactory = async ({
     
     await nft.deployed()
     await auction.deployed()
-
+    
     await auction.initialize(
+        bidToken === undefined ? ethers.constants.AddressZero : bidToken,
         nft.address,
         maxSupply,
         toWei(reservePrice),
@@ -109,16 +112,29 @@ describe('ScatterAuction', () => {
 
     it('should have parameters correctly initialized', async () => {
         const { auction, nft } = await auctionFactory({maxSupply: 420})
-        const totalSupply = await getparam('maxSupply', auction)
-        expect(totalSupply).to.equal(420)
+        const maxSupp = await getparam('maxSupply', auction)
+        expect(maxSupp).to.equal(420)
 
         const nftAddress = await getparam('nftContract', auction)
         expect(nftAddress).to.equal(nft.address)
+        expect(await getparam('isEthAuction', auction)).true
+        expect(await getparam('bidToken', auction)).to.equal(ethers.constants.AddressZero)
 
+    })
+    
+    it('should allow bidding on valid ids', async () => {
+        const { auction, } = await auctionFactory({reservePrice: 0.01, bidIncrement: 0.01})
+        const [_, bidder] = await ethers.getSigners();
+
+        const mkbid = (i: number) => 
+            auction.connect(bidder).createBid(i, 0, {value: getNextPrice(auction)})
+        
+        for (let i = 0; i < 5; i++)
+            await mkbid(1)
     })
 
     it('shouldn\'t allow bidding on non initialized ids', async () => {
-        const { auction, nft } = await auctionFactory({reservePrice: 0.01, bidIncrement: 0.01})
+        const { auction, } = await auctionFactory({reservePrice: 0.01, bidIncrement: 0.01})
         const maxSupply = await getparam('maxSupply', auction) as number
         const idsToTest = [0, 1, 2, maxSupply , 1231231231, 1]
         const shouldAllowBidding = idsToTest.map(id => id == 1)
@@ -126,12 +142,19 @@ describe('ScatterAuction', () => {
         const [_, bidder] = await ethers.getSigners();
 
         const mkbid = (i: number) => 
-            auction.connect(bidder).createBid(i, {value: getNextPrice(auction)})
+            auction.connect(bidder).createBid(i, 0, {value: getNextPrice(auction)})
 
         for (let i = 0; i < idsToTest.length; i++)
             if (shouldAllowBidding[i]) await mkbid(idsToTest[i])
             else await expect(mkbid(idsToTest[i])).to.be.reverted
     })
+
+    /*
+    it('should allow bids with ERC20 tokens', async () => {
+        // TODO
+        expect(0).to.equal(1);
+    })
+    */
 
     // Epic smoke test.
     it('should allow functional bidding and mint out', async () => {
@@ -146,7 +169,7 @@ describe('ScatterAuction', () => {
         const [_, bidder1, bidder2, bidder3] = await ethers.getSigners()
     
         const mkbid = (bidder: SignerWithAddress, i: number, eth: number) =>
-            auction.connect(bidder).createBid(i, {value: toWei(eth)})
+            auction.connect(bidder).createBid(i, 0, {value: toWei(eth)})
         
         await mkbid(bidder1, 1, 0.01)
         await mkbid(bidder2, 1, 0.015)
