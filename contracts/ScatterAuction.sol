@@ -6,6 +6,7 @@ pragma solidity ^0.8.4;
 import "solady/src/utils/SafeTransferLib.sol";
 import "solady/src/utils/SafeCastLib.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract ScatterAuction is Ownable {
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
@@ -20,6 +21,7 @@ contract ScatterAuction is Ownable {
     event AuctionReservePriceUpdated(uint256 reservePrice);
     event AuctionBidIncrementUpdated(uint256 bidIncrement);
     event AuctionDurationUpdated(uint256 duration);
+    event AuctionBidTokenUpdated(address token);
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
     /*                          STORAGE                           */
@@ -41,8 +43,12 @@ contract ScatterAuction is Ownable {
     struct AuctionData {
         // The address of the current highest bid.
         address bidder;
+        // Token used for bids, it will be used eth if set to 0
+        address bidToken;
         // The current highest bid amount.
         uint96 amount;
+        // If `bidToken == address(0)` then `isEthAuction == true`
+        bool isEthAuction;
         // The start time of the auction.
         uint40 startTime;
         // The end time of the auction.
@@ -54,7 +60,6 @@ contract ScatterAuction is Ownable {
         // Whether or not the auction has been settled.
         bool settled;
         // The ERC721 token contract.
-        // TODO refactor to "token"
         address nftContract;
         // The minimum price accepted in an auction.
         uint96 reservePrice;
@@ -93,6 +98,7 @@ contract ScatterAuction is Ownable {
     /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
 
     function initialize(
+        address bidToken,
         address nftContract,
         uint24 maxSupply,
         uint96 reservePrice,
@@ -108,6 +114,9 @@ contract ScatterAuction is Ownable {
         _checkReservePrice(reservePrice);
         _checkBidIncrement(bidIncrement);
         _checkDuration(duration);
+    
+        _auctionData.bidToken = bidToken;
+        _auctionData.isEthAuction = bidToken == address(0);
 
         _auctionData.nftContract = nftContract;
         _auctionData.maxSupply = maxSupply;
@@ -147,13 +156,15 @@ contract ScatterAuction is Ownable {
     /**
      * @dev Create a bid for a NFT, with a given amount.
      * This contract only accepts payment in ETH.
-     *
+     * @param biddedAmount Should be 0 if the auction is in eth.
      * The frontend should pass in the next `nftId` when the auction has ended.
      */
-    function createBid(uint256 nftId) public payable virtual {
+    function createBid(uint256 nftId, uint96 biddedAmount) public payable virtual {
         // To prevent gas under-estimation.
         require(gasleft() > 150000);
-
+        
+        // TODO analyze code for hyperinflationary tokens
+        if (_auctionData.isEthAuction) biddedAmount = SafeCastLib.toUint96(msg.value);
         /* ------- AUTOMATIC AUCTION CREATION AND SETTLEMENT -------- */
 
         bool creationFailed;
@@ -171,12 +182,17 @@ contract ScatterAuction is Ownable {
                 // After settling the auction, try to create a new auction.
                 if (!_createAuction()) {
                     // If the creation fails, it means that maxSupply was exceded
-                    // In this case, refund all the ETH sent and early return.
-                    SafeTransferLib.forceSafeTransferETH(msg.sender, msg.value);
+                    // In this case, refund all the bidded amount and early return.
+                    if (_auctionData.isEthAuction)
+                        SafeTransferLib.forceSafeTransferETH(msg.sender, msg.value);
                     return;
-                }
+                } 
             }
         }
+
+        if (!_auctionData.isEthAuction) IERC20(_auctionData.bidToken).transferFrom(
+            msg.sender, address(this), biddedAmount
+        );
         // If the auction creation fails, we must revert to prevent any bids.
         require(!creationFailed, "Cannot create auction.");
 
@@ -194,25 +210,25 @@ contract ScatterAuction is Ownable {
         //   but the current auction gets extended,
         //   and the bid gets accepted for the current auction.
         require(nftId == _auctionData.nftId, "Bid for wrong NFT ID.");
-
+        
         if (amount == 0) {
-            require(msg.value >= _auctionData.reservePrice, "Bid below reserve price.");
+            require(biddedAmount >= _auctionData.reservePrice, "Bid below reserve price.");
         } else {
             // Won't overflow. `amount` and `bidIncrement` are both stored as 96 bits.
-            require(msg.value >= amount + _auctionData.bidIncrement, "Bid too low.");
+            require(biddedAmount >= amount + _auctionData.bidIncrement, "Bid too low.");
         }
 
         _auctionData.bidder = msg.sender;
-        _auctionData.amount = SafeCastLib.toUint96(msg.value); // Won't overflow on ETH mainnet.
+        _auctionData.amount = biddedAmount;
 
         if (_auctionData.timeBuffer == 0) {
-            emit AuctionBid(nftId, msg.sender, msg.value, false);
+            emit AuctionBid(nftId, msg.sender, biddedAmount, false);
         } else {
             // Extend the auction if the bid was received within `timeBuffer` of the auction end time.
             uint256 extendedTime = block.timestamp + _auctionData.timeBuffer;
             // Whether the current timestamp falls within the time extension buffer period.
             bool extended = endTime < extendedTime;
-            emit AuctionBid(nftId, msg.sender, msg.value, extended);
+            emit AuctionBid(nftId, msg.sender, biddedAmount, extended);
 
             if (extended) {
                 _auctionData.endTime = SafeCastLib.toUint40(extendedTime);
@@ -222,7 +238,9 @@ contract ScatterAuction is Ownable {
 
         if (amount != 0) {
             // Refund the last bidder.
-            SafeTransferLib.forceSafeTransferETH(lastBidder, amount);
+            if (_auctionData.isEthAuction)
+                SafeTransferLib.forceSafeTransferETH(lastBidder, amount);
+            else IERC20(_auctionData.bidToken).transfer(lastBidder, amount);
         }
     }
 
@@ -278,34 +296,14 @@ contract ScatterAuction is Ownable {
         _auctionData.timeBuffer = timeBuffer;
         emit AuctionTimeBufferUpdated(timeBuffer);
     }
-
-    /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
-    /*                 EVENT EMITTERS FOR TESTING                 */
-    /*.•°:°.´+˚.*°.˚:*.´•*.+°.•°:´*.´•*.•°.•°:°.´:•˚°.*°.˚:*.´+°.•*/
-
-    function emitAuctionCreatedEvent(uint256 nftId, uint256 startTime, uint256 endTime)
-        external
-        onlyOwner
-    {
-        emit AuctionCreated(nftId, startTime, endTime);
-    }
-
-    function emitAuctionBidEvent(uint256 nftId, address bidder, uint256 amount, bool extended)
-        external
-        onlyOwner
-    {
-        emit AuctionBid(nftId, bidder, amount, extended);
-    }
-
-    function emitAuctionExtendedEvent(uint256 nftId, uint256 endTime) external onlyOwner {
-        emit AuctionExtended(nftId, endTime);
-    }
-
-    function emitAuctionSettledEvent(uint256 nftId, address winner, uint256 amount)
-        external
-        onlyOwner
-    {
-        emit AuctionSettled(nftId, winner, amount);
+    
+    /**
+     * @dev Set a new token to use for bids.
+     */
+    function setBidToken(address bidToken) external onlyOwner {
+        _auctionData.bidToken = bidToken;
+        _auctionData.isEthAuction = bidToken == address(0);
+        emit AuctionBidTokenUpdated(bidToken);
     }
 
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
@@ -347,8 +345,11 @@ contract ScatterAuction is Ownable {
         uint256 amount = _auctionData.amount;
         uint256 nftId = _auctionData.nftId;
         address nftContract = _auctionData.nftContract;
+    
+        if (_auctionData.isEthAuction)
+            payable(nftContract).transfer(amount);
+        else IERC20(_auctionData.bidToken).transfer(nftContract, amount);
 
-        payable(nftContract).transfer(amount);
         IAuctionedNFT(nftContract).safeTransferFrom(
             address(this), bidder, nftId
         );
