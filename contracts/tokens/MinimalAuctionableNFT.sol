@@ -5,8 +5,9 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../IExternallyMintable.sol";
 
-contract MinimalAuctionableNFT is ERC721, Ownable {
+contract MinimalAuctionableNFT is ERC721, Ownable, IExternallyMintable {
 
     address internal _minter;
     uint32 public nextTokenId;
@@ -15,13 +16,17 @@ contract MinimalAuctionableNFT is ERC721, Ownable {
         nextTokenId = 1;
     }
 
-    function mint() external payable onlyMinter returns (uint256 tokenId) {
+    function mint() external onlyMinter returns (uint256 tokenId) {
         tokenId = nextTokenId++;
         _mint(msg.sender, tokenId);
     }
 
     function setMinter(address minter) external onlyOwner {
         _minter = minter;
+    }
+
+    function isMinter(address minter) external view returns (bool) {
+        return minter == _minter; 
     }
 
     /**

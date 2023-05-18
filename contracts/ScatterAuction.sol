@@ -7,6 +7,8 @@ import "solady/src/utils/SafeTransferLib.sol";
 import "solady/src/utils/SafeCastLib.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "./IExternallyMintable.sol";
 
 contract ScatterAuction is Ownable {
     /*´:°•.°+.*•´.*:˚.°*.˚•´.°:°•.°•.*•´.*:˚.°*.˚•´.°:°•.°+.*•´.*:*/
@@ -312,7 +314,7 @@ contract ScatterAuction is Ownable {
     
         if (nftId > _auctionData.maxSupply) return false;
 
-        nftId = IAuctionedNFT(_auctionData.nftContract).mint();
+        nftId = IExternallyMintable(_auctionData.nftContract).mint();
     
         uint256 endTime = block.timestamp + _auctionData.duration;
         
@@ -341,7 +343,7 @@ contract ScatterAuction is Ownable {
             payable(nftContract).transfer(amount);
         else IERC20(_auctionData.bidToken).transfer(nftContract, amount);
 
-        IAuctionedNFT(nftContract).safeTransferFrom(
+        IERC721(nftContract).safeTransferFrom(
             address(this), bidder, nftId
         );
 
@@ -370,15 +372,5 @@ contract ScatterAuction is Ownable {
     function _checkDuration(uint32 duration) internal pure {
         require(duration != 0, "Duration must be greater than 0.");
     }
-}
-
-interface IAuctionedNFT {
-
-    function safeTransferFrom(address from, address to, uint256 tokenId) external; 
-
-    /**
-     * @dev Allows the minter to mint a NFT to itself.
-     */
-    function mint() external returns (uint256 tokenId);
 }
 
