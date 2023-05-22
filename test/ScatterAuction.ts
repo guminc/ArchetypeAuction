@@ -1,13 +1,6 @@
-import { ethers, upgrades } from 'hardhat';
+import { ethers } from 'hardhat';
 import { expect } from 'chai';
 
-import { 
-    MinimalAuctionableNFT,
-    MinimalAuctionableNFT__factory,
-    ScatterAuction,
-    ScatterAuction__factory 
-} from '../typechain-types';
-import { BigNumber, Contract } from 'ethers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 
 import { 

@@ -10,25 +10,31 @@ import "../IExternallyMintable.sol";
 contract MinimalAuctionableNFT is ERC721, Ownable, IExternallyMintable {
 
     address internal _minter;
-    uint32 public nextTokenId;
 
-	constructor(string memory name, string memory symbol) ERC721(name, symbol) {
-        nextTokenId = 1;
-    }
-
-    function mint() external onlyMinter returns (uint256 tokenId) {
-        tokenId = nextTokenId++;
-        _mint(msg.sender, tokenId);
+	constructor(string memory name, string memory symbol) ERC721(name, symbol) {}
+    
+    // -- IExternallyMintable realization -- //
+    function mint(uint24 tokenId, address to) external onlyMinter {
+        _mint(to, tokenId);
     }
 
     function setMinter(address minter) external onlyOwner {
         _minter = minter;
     }
 
+    function removeMinter(address minter) external onlyOwner {
+        if (minter == _minter) _minter = address(0);
+    }
+
     function isMinter(address minter) external view returns (bool) {
         return minter == _minter; 
     }
 
+    function maxSupply() external pure returns (uint24) {
+        return 10000;
+    }
+
+    // -- State and helpers -- //
     /**
      * @dev Guards a function such that only the minter is authorized to call it.
      */
@@ -46,4 +52,5 @@ contract MinimalAuctionableNFT is ERC721, Ownable, IExternallyMintable {
 	function withdraw(address token) external onlyOwner {
         IERC20(token).transfer(msg.sender, IERC20(token).balanceOf(address(this)));
 	}
+
 }
