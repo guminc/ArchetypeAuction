@@ -1,6 +1,7 @@
 import { ethers } from 'hardhat';
 
 import { 
+    AutoAuction,
     ScatterAuction,
 } from '../typechain-types';
 import { BigNumber, Contract } from 'ethers';
@@ -31,13 +32,13 @@ const fromParamToAuctionIndex: any = {
     "nftContractBalance": 14
 }
 
-export const getparam = async (param: string, auction: ScatterAuction) => {
+export const getparam = async (param: string, auction: AutoAuction) => {
     const data = await auction.auctionData()
     if (param in data) return data[fromParamToAuctionIndex[param]]
     else return 'NONE'
 };
 
-export const getNextPrice = async (auction: ScatterAuction) => {
+export const getNextPrice = async (auction: AutoAuction) => {
     const lastPrice = await getparam('amount', auction) as BigNumber
         
     const increment = lastPrice.eq(0) ? 
@@ -47,7 +48,7 @@ export const getNextPrice = async (auction: ScatterAuction) => {
     return lastPrice.add(increment)
 };
 
-export const getNextId = async (auction: ScatterAuction): Promise<number> => {
+export const getNextId = async (auction: AutoAuction): Promise<number> => {
     const n = await getparam('nftId', auction) as number
     if (n === 0 || await getparam('settled', auction))
         return n + 1
@@ -66,7 +67,7 @@ export const auctionFactory = async ({
     bidIncrement = 0.05,
     auctionDuration = 3 * 60 * 60, // 3 hours
     extraBidTime = 5 * 60, // 5 mins
-    auctionType = 'ScatterAuction',
+    auctionType = 'AutoAuction',
     useBidToken = false,
 }) => {
     const AuctionFactory = await ethers.getContractFactory(auctionType);
@@ -76,7 +77,7 @@ export const auctionFactory = async ({
     const [deployer, ] = await ethers.getSigners()
     
     const nft = await NftFactory.deploy('TestNft', 'TEST')
-    const auction = await AuctionFactory.deploy() as ScatterAuction
+    const auction = await AuctionFactory.deploy() as AutoAuction
     const bidToken = await TestErc20Factory.connect(deployer).deploy()
     
     await nft.deployed()

@@ -12,7 +12,7 @@ import {
     auctionFactory
 } from '../scripts/helpers';
 
-describe('ScatterAuction', () => {
+describe('AutoAuction', () => {
 
     it('should have parameters correctly initialized', async () => {
         const { auction, nft } = await auctionFactory({maxSupply: 420})

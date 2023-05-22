@@ -315,7 +315,6 @@ contract AutoAuction is Ownable {
         if (nftId > _auctionData.maxSupply) return false;
 
         IExternallyMintable(_auctionData.nftContract).mint(nftId, address(this));
-        nftId++;
 
         uint256 endTime = block.timestamp + _auctionData.duration;
         
