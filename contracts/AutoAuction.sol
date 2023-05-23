@@ -157,7 +157,6 @@ contract AutoAuction is Ownable {
 
     /**
      * @dev Create a bid for a NFT, with a given amount.
-     * This contract only accepts payment in ETH.
      * @param biddedAmount Should be 0 if the auction is in eth.
      * The frontend should pass in the next `nftId` when the auction has ended.
      */
@@ -226,7 +225,8 @@ contract AutoAuction is Ownable {
         if (_auctionData.timeBuffer == 0) {
             emit AuctionBid(nftId, msg.sender, biddedAmount, false);
         } else {
-            // Extend the auction if the bid was received within `timeBuffer` of the auction end time.
+            // Extend the auction if the bid was received within `timeBuffer` of the
+            // auction end time.
             uint256 extendedTime = block.timestamp + _auctionData.timeBuffer;
             // Whether the current timestamp falls within the time extension buffer period.
             bool extended = endTime < extendedTime;
