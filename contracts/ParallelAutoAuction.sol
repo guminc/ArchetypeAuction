@@ -6,6 +6,7 @@ import "./IExternallyMintable.sol";
 
 error WrongTokenId();
 error WrongBidAmount();
+error AuctionPaused();
 
 contract ParallelAutoAuction {
     
@@ -77,9 +78,12 @@ contract ParallelAutoAuction {
         
         uint8 lineNumber = uint8(nftId % auctionConfig.lines);
         LineState storage line = lineToState[lineNumber];
-        bool lastLineAuctionEnded = line.endTime > block.timestamp;
+        bool lastLineAuctionEnded = block.timestamp > line.endTime;
         IExternallyMintable token = IExternallyMintable(auctionConfig.auctionedNft);
         
+        if (token.isMinter(address(this)))
+            revert AuctionPaused();
+
         /* ---------- AUCTION UPDATING AND SETTLEMENT ---------- */
         if (lastLineAuctionEnded && !token.exists(line.head))
             _settleAuction(line);
@@ -111,9 +115,9 @@ contract ParallelAutoAuction {
     function settleAuction(uint24 nftId) external {
         LineState memory line = lineToState[uint8(nftId % auctionConfig.lines)];
         IExternallyMintable token = IExternallyMintable(auctionConfig.auctionedNft);
-        require(line.endTime > block.timestamp, "Auction still ongoing.");
+        require(block.timestamp > line.endTime, "Auction still ongoing.");
         require(line.head != 0, "Auction not started.");
-        require(token.exists(nftId), "Token already settled.");
+        require(!token.exists(nftId), "Token already settled.");
         _settleAuction(line);
     }
 
