@@ -132,7 +132,7 @@ contract ParallelAutoAuction {
      * `line`. If is the first auction for this line (if `line.head == 0`)
      * then the token id should be the line number itself. Otherwise
      * increment the id by the number of lines. For more info about the 
-     * second case check the `this.lines()` doc.
+     * second case check the `AuctionConfig.lines` doc.
      * @notice This function should be the only one allowed to change
      * `line.startTime`, `line.endTime` and `line.head` state, and it should
      * do so only when the dev is sure thats its time to auction the next
@@ -143,5 +143,32 @@ contract ParallelAutoAuction {
         line.endTime = uint40(block.timestamp + auctionConfig.baseDuration);
         line.head += line.head == 0 ? lineNumber : auctionConfig.lines;
     }
+
+    /* -- HELPER VIEW FUNCTIONS -- */
+    /**
+     * @return An array with all the token ids that can currently get auctioned.
+     */
+    function getIdsToAuction() public view returns (uint24[] memory) {
+        uint24[] memory ids = new uint24[](auctionConfig.lines); 
+        for (uint8 i = 0; i < auctionConfig.lines; i++) {
+            LineState memory line = lineToState[i+1];
+            uint24 lineId = line.head;
+            if (lineId == 0) lineId = i + 1;
+            else if (block.timestamp > line.endTime) lineId++;
+            ids[i] = lineId;
+        }
+        return ids;
+    }
+    
+    /**
+     * @return The current minimum bid price for an `tokenId`.
+     */
+    function getMinPriceFor(uint24 tokenId) public view returns (uint96) {
+        uint8 lineNumber = uint8(tokenId % auctionConfig.lines);
+        LineState memory line = lineToState[lineNumber];
+        if (block.timestamp > line.endTime) return auctionConfig.startingPrice;
+        else return line.currentPrice + auctionConfig.bidIncrement;
+    }
+
 }
 
