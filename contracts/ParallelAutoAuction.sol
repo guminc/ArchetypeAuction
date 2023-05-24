@@ -154,12 +154,12 @@ contract ParallelAutoAuction {
      * @return An array with all the token ids that can currently get auctioned.
      */
     function getIdsToAuction() public view returns (uint24[] memory) {
-        uint24[] memory ids = new uint24[](auctionConfig.lines); 
+        uint24[] memory ids = new uint24[](auctionConfig.lines);
         for (uint8 i = 0; i < auctionConfig.lines; i++) {
             LineState memory line = lineToState[i+1];
             uint24 lineId = line.head;
             if (lineId == 0) lineId = i + 1;
-            else if (block.timestamp > line.endTime) lineId++;
+            else if (block.timestamp > line.endTime) lineId += auctionConfig.lines;
             ids[i] = lineId;
         }
         return ids;

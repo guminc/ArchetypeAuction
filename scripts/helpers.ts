@@ -1,9 +1,6 @@
 import { ethers } from 'hardhat';
 
-import { 
-    AutoAuction,
-    ScatterAuction,
-} from '../typechain-types';
+import { AutoAuction, } from '../typechain-types';
 import { BigNumber, Contract, ContractTransaction } from 'ethers';
 
 import { ParallelAutoAuction } from '../typechain-types/contracts/ParallelAutoAuction'

@@ -1,5 +1,5 @@
 import { assert, expect } from 'chai';
-import { LineState, fromWei, getContractBalance, getRandomFundedAccount, mkBid, mkMinBid, parallelAutoAuction, range, sleep, toWei } from '../scripts/helpers';
+import { LineState, fromWei, getContractBalance, getLastTimestamp, getRandomFundedAccount, mkBid, mkMinBid, parallelAutoAuction, range, sleep, sum, sumBigNumbers, toWei } from '../scripts/helpers';
 import * as A from 'fp-ts/Array'
 import * as N from 'fp-ts/number'
 import { ethers } from 'hardhat';
@@ -156,19 +156,43 @@ describe('ParallelAutoAuction', async () => {
             3, { value: await auction.getMinPriceFor(3) }
         )
         
-        await sleep(2)
+        await sleep(3)
 
         const idsGot = await auction.getIdsToAuction()
         const areEqual = A.getEq(N.Eq).equals(idsGot, expectedIds)
 
-        console.log(idsGot)
-        console.log(expectedIds)
-
         assert(areEqual)
     })
 
+    it('should show right min price', async () => {
+        const iniPrice = 0.1
+        const bidIncrement = 0.05
+        const epsilon = 0.0196
+
+        const { auction, user } = await parallelAutoAuction({
+            startingPrice: iniPrice, bidIncrement
+        })
+
+        expect(await auction.getMinPriceFor(1)).equals(toWei(iniPrice))
+
+
+        await auction.connect(user).createBid(
+            1, { value: toWei(iniPrice).add(toWei(epsilon)) }
+        )
+
+        expect(await auction.getMinPriceFor(1)).equals(
+            toWei(iniPrice).add(toWei(bidIncrement)).add(toWei(epsilon))
+        )
+    })
+
+    it('should use right min price over different ids', async () => {
+        expect(1).equals(2)
+        // TODO
+    })
+
+
     it('reentrancy test', async () => {
-        const { auction, nft } = await parallelAutoAuction({
+        const { auction } = await parallelAutoAuction({
             auctionDuration: 10, 
             extraAuctionTime: 0,
             startingPrice: 1,
@@ -201,6 +225,11 @@ describe('ParallelAutoAuction', async () => {
         expect(line.currentPrice).to.equals(expectedPrice)
         expect(finalContractBal).greaterThan(iniContractBal)
         expect(finalContractBal).equals(expectedPrice)
+    })
+
+    it('should allow minting out', async () => {
+        expect(1).equals(2)
+        // TODO
     })
 
 });
