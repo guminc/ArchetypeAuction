@@ -4,7 +4,29 @@ import {
     AutoAuction,
     ScatterAuction,
 } from '../typechain-types';
-import { BigNumber, Contract } from 'ethers';
+import { BigNumber, Contract, ContractTransaction } from 'ethers';
+
+import { ParallelAutoAuction } from '../typechain-types/contracts/ParallelAutoAuction'
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
+import * as RNEA from 'fp-ts/ReadonlyNonEmptyArray'
+
+/* -- Utility pure functions -- */
+// TODO note that some of those functions are dupes of 
+// scatter-art/ArchetypeERC20/scripts/helpers.ts, so they
+// should get decoupled to an unique module.
+export const randomAddress = () => `0x${[...Array(40)]
+    .map(() => Math.floor(Math.random() * 16).toString(16))
+    .join('')}`;
+
+export const getRandomAccount = async () => 
+    await ethers.getImpersonatedSigner(randomAddress())
+
+export const getRandomFundedAccount = async (funds: number = 10) => {
+    const acc = await getRandomAccount() 
+    const [admin, ] = await ethers.getSigners()
+    await admin.sendTransaction({to: acc.address, value: toWei(funds)})
+    return acc
+};
 
 export const id = (x: any): any => x
 export const randrange = (min: number, max: number) =>
@@ -13,6 +35,34 @@ export const randrange = (min: number, max: number) =>
 export const toWei = (x: number) => ethers.utils.parseUnits(x.toString(), 'ether')
 export const fromWei = (x: BigNumber) => ethers.utils.formatEther(x)
 export const sleep = (s: number) => new Promise(resolve => setTimeout(resolve, s*1000)); 
+
+
+type MkBid = 
+    (auction: ParallelAutoAuction) => 
+    (bidder: SignerWithAddress) => 
+    (id: number) =>
+    (bid: BigNumber) => 
+    () => Promise<ContractTransaction>
+
+export const mkBid: MkBid = auction => bidder => id => bid =>
+    async () => await auction.connect(bidder).createBid(
+        id, { value: bid }
+    )
+
+type MkMinbid = 
+    (auction: ParallelAutoAuction) => 
+    (bidder: SignerWithAddress) => 
+    (id: number) =>
+    () => Promise<ContractTransaction>
+
+export const mkMinBid: MkMinbid = auction => bidder => id  =>
+    async () => await mkBid(auction)(bidder)(id)(
+        await auction.getMinPriceFor(id)
+    )()
+
+
+export const range = (a: number, b: number): number[] => [...RNEA.range(a, b)]
+
 
 const fromParamToAuctionIndex: any = {
     "bidder": 0,
@@ -97,3 +147,38 @@ export const auctionFactory = async ({
 
     return { auction, nft, bidToken }
 }
+
+export const parallelAutoAuction = async({
+    auctionsAtSameTime = 4,
+    auctionDuration = 10, // 10 seconds
+    extraAuctionTime = 3, // 3 seconds
+    startingPrice = 0.1, // 0.1 eth
+    bidIncrement = 0.05, // 0.05 eth
+}) => {
+    const AuctionFactory = await ethers.getContractFactory('ParallelAutoAuction');
+    const NftFactory = await ethers.getContractFactory('MinimalAuctionableNFT')
+    const [deployer, ] = await ethers.getSigners()
+
+    const user = await getRandomFundedAccount()
+
+    const nft = await NftFactory.connect(deployer).deploy('TestNft', 'TEST')
+    const auction = await AuctionFactory.connect(deployer).deploy(
+        nft.address,
+        auctionsAtSameTime,
+        auctionDuration,
+        extraAuctionTime,
+        toWei(startingPrice),
+        toWei(bidIncrement)
+    )
+
+    await nft.connect(deployer).setMinter(auction.address)
+
+    return {
+        nft, auction, deployer, user
+    }
+}
+
+type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
+export type LineState = UnwrapPromise<ReturnType<ParallelAutoAuction['lineToState']>>
+
+

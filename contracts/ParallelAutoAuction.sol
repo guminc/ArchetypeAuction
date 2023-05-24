@@ -56,18 +56,22 @@ contract ParallelAutoAuction {
     AuctionConfig public auctionConfig;
 
     // @notice `lineToState[i]` should only be mutable from the line `i`. 
-    mapping(uint8 => LineState) private lineToState;
+    mapping(uint8 => LineState) public lineToState;
 
     constructor(
         address nftToAuction,
-        uint8 numberOfAuctionsAtTheSameTime,
-        uint32 singleAuctionDuration,
-        uint32 extraAuctionTime
+        uint8 lines,
+        uint32 baseDuration,
+        uint32 timeBuffer,
+        uint96 startingPrice,
+        uint96 bidIncrement
     ) {
         auctionConfig.auctionedNft = nftToAuction;
-        auctionConfig.lines = numberOfAuctionsAtTheSameTime;
-        auctionConfig.baseDuration = singleAuctionDuration;
-        auctionConfig.timeBuffer = extraAuctionTime;
+        auctionConfig.lines = lines;
+        auctionConfig.baseDuration = baseDuration;
+        auctionConfig.timeBuffer = timeBuffer;
+        auctionConfig.startingPrice = startingPrice;
+        auctionConfig.bidIncrement = bidIncrement;
     }
 
     /**
@@ -81,11 +85,11 @@ contract ParallelAutoAuction {
         bool lastLineAuctionEnded = block.timestamp > line.endTime;
         IExternallyMintable token = IExternallyMintable(auctionConfig.auctionedNft);
         
-        if (token.isMinter(address(this)))
+        if (!token.isMinter(address(this)))
             revert AuctionPaused();
 
         /* ---------- AUCTION UPDATING AND SETTLEMENT ---------- */
-        if (lastLineAuctionEnded && !token.exists(line.head))
+        if (lastLineAuctionEnded && !token.exists(line.head) && line.head > 0)
             _settleAuction(line);
         
         if (line.head == 0 || lastLineAuctionEnded)
@@ -142,6 +146,7 @@ contract ParallelAutoAuction {
         line.startTime = uint40(block.timestamp);
         line.endTime = uint40(block.timestamp + auctionConfig.baseDuration);
         line.head += line.head == 0 ? lineNumber : auctionConfig.lines;
+        line.currentPrice = 0;
     }
 
     /* -- HELPER VIEW FUNCTIONS -- */
