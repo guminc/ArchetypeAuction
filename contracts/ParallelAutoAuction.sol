@@ -2,13 +2,14 @@
 
 pragma solidity ^0.8.4;
 
-import "./IExternallyMintable.sol";
+import "./interfaces/IExternallyMintable.sol";
+import "./interfaces/IEthAuction.sol";
 
 error WrongTokenId();
 error WrongBidAmount();
 error AuctionPaused();
 
-contract ParallelAutoAuction {
+contract ParallelAutoAuction is IEthAuction {
     
     struct AuctionConfig {
         address auctionedNft;
@@ -149,10 +150,8 @@ contract ParallelAutoAuction {
         line.currentPrice = 0;
     }
 
-    /* -- HELPER VIEW FUNCTIONS -- */
-    /**
-     * @return An array with all the token ids that can currently get auctioned.
-     */
+
+    /* -- IAuctionInfo realizations -- */
     function getIdsToAuction() public view returns (uint24[] memory) {
         uint24[] memory ids = new uint24[](auctionConfig.lines);
         for (uint8 i = 0; i < auctionConfig.lines; i++) {
@@ -164,10 +163,12 @@ contract ParallelAutoAuction {
         }
         return ids;
     }
+
+    function getAuctionedToken() public view returns (address) {
+        return auctionConfig.auctionedNft;
+    }
     
-    /**
-     * @return The current minimum bid price for an `tokenId`.
-     */
+    // TODO it shoudl revert if `tokenId != expectedHead`
     function getMinPriceFor(uint24 tokenId) public view returns (uint96) {
         uint8 lineNumber = uint8(tokenId % auctionConfig.lines);
         LineState memory line = lineToState[lineNumber];

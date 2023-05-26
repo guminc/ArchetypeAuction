@@ -3,7 +3,7 @@
 pragma solidity ^0.8.4;
 
 import "./AutoAuction.sol";
-import "./ISharesHolder.sol";
+import "./interfaces/ISharesHolder.sol";
 
 contract RewardedAuction is AutoAuction, ISharesHolder {
 
