@@ -3,7 +3,6 @@
 pragma solidity ^0.8.4;
 
 interface IAuctionInfo {
-    
     /**
      * @return The auctioned NFT (or maybe any other type of token).
      */

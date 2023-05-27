@@ -2,62 +2,20 @@
 
 pragma solidity ^0.8.4;
 
+import "./interfaces/IParallelAutoAuction.sol";
 import "./interfaces/IExternallyMintable.sol";
-import "./interfaces/IEthAuction.sol";
 
 error WrongTokenId();
 error WrongBidAmount();
 error AuctionPaused();
 
-contract ParallelAutoAuction is IEthAuction {
+contract ParallelAutoAuction is IParallelAutoAuction {
     
-    struct AuctionConfig {
-        address auctionedNft;
-        /**
-         * @notice The number of auctions that can happen at the same time. For
-         * example, if `lines == 3`, those will be the auctioned token ids over
-         * time:
-         *
-         * --- TIME --->
-         * 
-         *  line 1: |--- 1 ---|---- 4 ----|--- 7 ---|---- 10 ---- ...
-         *  line 2: |-- 2 --|----- 5 -----|-- 8 --|---- 11 ---- ...
-         *  line 3: |---- 3 ----|-- 6 --|---- 9 ----|----- 12 ----- ...
-         *
-         * Then, from the front-end, you only need to call `lineToState[l].head`
-         * to query the current auctioned nft at line `l`. For example, in the
-         * graph above, `lineToState[2].head == 11`.
-         */
-        uint8 lines;
-        // @notice The base duration is the time that takes a single auction
-        // without considering time buffering.
-        uint32 baseDuration;
-        // @notice Extra auction time if a bid happens close to the auction end.
-        uint32 timeBuffer;
-        // @notice The minimum price accepted in an auction.
-        uint96 startingPrice;
-        // @notice The minimum bid increment.
-        uint96 bidIncrement;
-    }
-    
-    /**
-     * @dev LineState represents a single auction line, so there will be
-     * exactly `auctionConfig.lines` LineStates.
-     */
-    struct LineState {
-        // @notice head Is the current auctioned token id at the line.
-        uint24 head;
-        uint40 startTime;
-        uint40 endTime;
-        address currentWinner;
-        uint96 currentPrice;
-    }
-
     // @notice The config for the auction should be immutable.
-    AuctionConfig public auctionConfig;
+    AuctionConfig private _auctionConfig;
 
-    // @notice `lineToState[i]` should only be mutable from the line `i`. 
-    mapping(uint8 => LineState) public lineToState;
+    // @notice `_lineToState[i]` should only be mutable from the line `i`. 
+    mapping(uint8 => LineState) private _lineToState;
 
     constructor(
         address nftToAuction,
@@ -67,12 +25,12 @@ contract ParallelAutoAuction is IEthAuction {
         uint96 startingPrice,
         uint96 bidIncrement
     ) {
-        auctionConfig.auctionedNft = nftToAuction;
-        auctionConfig.lines = lines;
-        auctionConfig.baseDuration = baseDuration;
-        auctionConfig.timeBuffer = timeBuffer;
-        auctionConfig.startingPrice = startingPrice;
-        auctionConfig.bidIncrement = bidIncrement;
+        _auctionConfig.auctionedNft = nftToAuction;
+        _auctionConfig.lines = lines;
+        _auctionConfig.baseDuration = baseDuration;
+        _auctionConfig.timeBuffer = timeBuffer;
+        _auctionConfig.startingPrice = startingPrice;
+        _auctionConfig.bidIncrement = bidIncrement;
     }
 
     /**
@@ -81,10 +39,10 @@ contract ParallelAutoAuction is IEthAuction {
      */
     function createBid(uint24 nftId) public payable virtual {
         
-        uint8 lineNumber = uint8(nftId % auctionConfig.lines);
-        LineState storage line = lineToState[lineNumber];
+        uint8 lineNumber = uint8(nftId % _auctionConfig.lines);
+        LineState storage line = _lineToState[lineNumber];
         bool lastLineAuctionEnded = block.timestamp > line.endTime;
-        IExternallyMintable token = IExternallyMintable(auctionConfig.auctionedNft);
+        IExternallyMintable token = IExternallyMintable(_auctionConfig.auctionedNft);
         
         if (!token.isMinter(address(this)))
             revert AuctionPaused();
@@ -101,8 +59,8 @@ contract ParallelAutoAuction is IEthAuction {
         
         /* ------------------ BIDDING LOGIC ------------------ */
         if (
-            (line.currentPrice == 0 && msg.value < auctionConfig.startingPrice) ||
-            line.currentPrice + auctionConfig.bidIncrement > msg.value
+            (line.currentPrice == 0 && msg.value < _auctionConfig.startingPrice) ||
+            line.currentPrice + _auctionConfig.bidIncrement > msg.value
         ) revert WrongBidAmount();
 
         if (line.currentPrice != 0)
@@ -111,15 +69,15 @@ contract ParallelAutoAuction is IEthAuction {
         line.currentPrice = uint96(msg.value);
         line.currentWinner = msg.sender;
         
-        uint40 extendedTime = uint40(block.timestamp + auctionConfig.timeBuffer);
+        uint40 extendedTime = uint40(block.timestamp + _auctionConfig.timeBuffer);
         if (extendedTime > line.endTime)
             line.endTime = extendedTime;
 
     }
 
     function settleAuction(uint24 nftId) external {
-        LineState memory line = lineToState[uint8(nftId % auctionConfig.lines)];
-        IExternallyMintable token = IExternallyMintable(auctionConfig.auctionedNft);
+        LineState memory line = _lineToState[uint8(nftId % _auctionConfig.lines)];
+        IExternallyMintable token = IExternallyMintable(_auctionConfig.auctionedNft);
         require(block.timestamp > line.endTime, "Auction still ongoing.");
         require(line.head != 0, "Auction not started.");
         require(!token.exists(nftId), "Token already settled.");
@@ -127,7 +85,7 @@ contract ParallelAutoAuction is IEthAuction {
     }
 
     function _settleAuction(LineState memory line) private {
-        address nftContract = auctionConfig.auctionedNft;
+        address nftContract = _auctionConfig.auctionedNft;
         IExternallyMintable(nftContract).mint(line.head, line.currentWinner);
         payable(nftContract).transfer(line.currentPrice);
     }
@@ -145,35 +103,45 @@ contract ParallelAutoAuction is IEthAuction {
      */
     function _updateLine(LineState storage line, uint8 lineNumber) private {
         line.startTime = uint40(block.timestamp);
-        line.endTime = uint40(block.timestamp + auctionConfig.baseDuration);
-        line.head += line.head == 0 ? lineNumber : auctionConfig.lines;
+        line.endTime = uint40(block.timestamp + _auctionConfig.baseDuration);
+        line.head += line.head == 0 ? lineNumber : _auctionConfig.lines;
         line.currentPrice = 0;
     }
 
 
     /* -- IAuctionInfo realizations -- */
     function getIdsToAuction() public view returns (uint24[] memory) {
-        uint24[] memory ids = new uint24[](auctionConfig.lines);
-        for (uint8 i = 0; i < auctionConfig.lines; i++) {
-            LineState memory line = lineToState[i+1];
+        uint24[] memory ids = new uint24[](_auctionConfig.lines);
+        for (uint8 i = 0; i < _auctionConfig.lines; i++) {
+            LineState memory line = _lineToState[i+1];
             uint24 lineId = line.head;
             if (lineId == 0) lineId = i + 1;
-            else if (block.timestamp > line.endTime) lineId += auctionConfig.lines;
+            else if (block.timestamp > line.endTime) lineId += _auctionConfig.lines;
             ids[i] = lineId;
         }
         return ids;
     }
 
     function getAuctionedToken() public view returns (address) {
-        return auctionConfig.auctionedNft;
+        return _auctionConfig.auctionedNft;
     }
     
     // TODO it shoudl revert if `tokenId != expectedHead`
     function getMinPriceFor(uint24 tokenId) public view returns (uint96) {
-        uint8 lineNumber = uint8(tokenId % auctionConfig.lines);
-        LineState memory line = lineToState[lineNumber];
-        if (block.timestamp > line.endTime) return auctionConfig.startingPrice;
-        else return line.currentPrice + auctionConfig.bidIncrement;
+        uint8 lineNumber = uint8(tokenId % _auctionConfig.lines);
+        LineState memory line = _lineToState[lineNumber];
+        if (block.timestamp > line.endTime) return _auctionConfig.startingPrice;
+        else return line.currentPrice + _auctionConfig.bidIncrement;
+    }
+    
+
+    /* -- IHoldsParallelAutoAuctionData realizations --*/
+    function auctionConfig() external view returns (AuctionConfig memory) {
+        return _auctionConfig;    
+    }
+
+    function lineState(uint8 tokenId) external view returns (LineState memory) {
+        return _lineToState[uint8(tokenId % _auctionConfig.lines)];
     }
 
 }

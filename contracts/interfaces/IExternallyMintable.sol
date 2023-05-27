@@ -2,7 +2,9 @@
 
 pragma solidity ^0.8.4;
 
-interface IExternallyMintable {
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+
+interface IExternallyMintable is IERC721 {
     /**
      * @dev Allows the minter to mint a NFT to `to`.
      */
