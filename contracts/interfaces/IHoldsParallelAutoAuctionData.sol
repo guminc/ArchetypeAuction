@@ -47,5 +47,13 @@ struct LineState {
 
 interface IHoldsParallelAutoAuctionData {
     function auctionConfig() external view returns (AuctionConfig memory);
-    function lineState(uint8) external view returns (LineState memory);
+    /**
+     * @return Current line state at `tokenId`, with data updated if the
+     * auction for that line should get settled.
+     */
+    function lineState(uint24 tokenId) external view returns (LineState memory);
+    /**
+     * @return All `LineState`s.
+     */
+    function lineStates() external view returns (LineState[] memory);
 }

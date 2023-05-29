@@ -73,7 +73,7 @@ describe('ParallelAutoAuction', async () => {
 
         const bidder = await getRandomFundedAccount()
         
-        const getLine = async (id: number) => await auction.lineToState(id)
+        const getLine = async (id: number) => await auction.lineState(id)
         const getLines = async () => await Promise.all(ids.map(getLine))
 
         const lineHeadIs = (n: number) => (line: LineState) => line.head === n
@@ -216,7 +216,7 @@ describe('ParallelAutoAuction', async () => {
         const finBal = await hacker.getBalance()
         const legitFinBal = await bidder.getBalance()
 
-        const line = await auction.lineToState(1)
+        const line = await auction.lineState(1)
         const finalContractBal = await getContractBalance(auction)
         
         expect(finBal).to.lessThan(iniBal)

@@ -48,10 +48,6 @@ contract ScatterAuctionFuzzTest is ScatterAuction {
             state.timeBuffer
         ));
     }
-
-    function echidna_test_mutable_state() public view returns (bool) {
-        
-    }
     
 }
 

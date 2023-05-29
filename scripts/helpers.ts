@@ -145,20 +145,22 @@ export const auctionFactory = async ({
     return { auction, nft, bidToken }
 }
 
-export const parallelAutoAuction = async({
+export const parallelAutoAuction = async ({
     auctionsAtSameTime = 4,
     auctionDuration = 10, // 10 seconds
     extraAuctionTime = 3, // 3 seconds
     startingPrice = 0.1, // 0.1 eth
     bidIncrement = 0.05, // 0.05 eth
+    mainnet = false
 }) => {
     const AuctionFactory = await ethers.getContractFactory('ParallelAutoAuction');
     const NftFactory = await ethers.getContractFactory('MinimalAuctionableNFT')
     const [deployer, ] = await ethers.getSigners()
-
-    const user = await getRandomFundedAccount()
+    
+    const user = mainnet ? undefined : await getRandomFundedAccount()
 
     const nft = await NftFactory.connect(deployer).deploy('TestNft', 'TEST')
+
     const auction = await AuctionFactory.connect(deployer).deploy(
         nft.address,
         auctionsAtSameTime,

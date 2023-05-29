@@ -39,7 +39,7 @@ contract ParallelAutoAuction is IParallelAutoAuction {
      */
     function createBid(uint24 nftId) public payable virtual {
         
-        uint8 lineNumber = uint8(nftId % _auctionConfig.lines);
+        uint8 lineNumber = tokenIdToLineNumber(nftId);
         LineState storage line = _lineToState[lineNumber];
         bool lastLineAuctionEnded = block.timestamp > line.endTime;
         IExternallyMintable token = IExternallyMintable(_auctionConfig.auctionedNft);
@@ -76,7 +76,7 @@ contract ParallelAutoAuction is IParallelAutoAuction {
     }
 
     function settleAuction(uint24 nftId) external {
-        LineState memory line = _lineToState[uint8(nftId % _auctionConfig.lines)];
+        LineState memory line = _lineToState[tokenIdToLineNumber(nftId)];
         IExternallyMintable token = IExternallyMintable(_auctionConfig.auctionedNft);
         require(block.timestamp > line.endTime, "Auction still ongoing.");
         require(line.head != 0, "Auction not started.");
@@ -110,7 +110,7 @@ contract ParallelAutoAuction is IParallelAutoAuction {
 
 
     /* -- IAuctionInfo realizations -- */
-    function getIdsToAuction() public view returns (uint24[] memory) {
+    function getIdsToAuction() external view returns (uint24[] memory) {
         uint24[] memory ids = new uint24[](_auctionConfig.lines);
         for (uint8 i = 0; i < _auctionConfig.lines; i++) {
             LineState memory line = _lineToState[i+1];
@@ -122,12 +122,12 @@ contract ParallelAutoAuction is IParallelAutoAuction {
         return ids;
     }
 
-    function getAuctionedToken() public view returns (address) {
+    function getAuctionedToken() external view returns (address) {
         return _auctionConfig.auctionedNft;
     }
     
-    // TODO it shoudl revert if `tokenId != expectedHead`
-    function getMinPriceFor(uint24 tokenId) public view returns (uint96) {
+    // TODO it should revert if `tokenId != expectedHead`
+    function getMinPriceFor(uint24 tokenId) external view returns (uint96) {
         uint8 lineNumber = uint8(tokenId % _auctionConfig.lines);
         LineState memory line = _lineToState[lineNumber];
         if (block.timestamp > line.endTime) return _auctionConfig.startingPrice;
@@ -140,8 +140,35 @@ contract ParallelAutoAuction is IParallelAutoAuction {
         return _auctionConfig;    
     }
 
-    function lineState(uint8 tokenId) external view returns (LineState memory) {
-        return _lineToState[uint8(tokenId % _auctionConfig.lines)];
+    function lineState(uint24 tokenId) external view returns (LineState memory) {
+        return _lineState(tokenId);
+    }
+
+    function lineStates() external view returns (LineState[] memory lines) {
+        lines = new LineState[](_auctionConfig.lines);
+        for (uint8 i = 0; i < _auctionConfig.lines; i++)
+            lines[i] = _lineState(i+1);
+    }
+
+    function _lineState(uint24 tokenId) private view returns (LineState memory line) {
+        uint8 lineNumber = tokenIdToLineNumber(tokenId);
+        line = _lineToState[lineNumber];
+        
+        if (line.head == 0 || block.timestamp > line.endTime) {
+            line.head += line.head == 0 ? lineNumber : _auctionConfig.lines;
+            line.startTime = uint40(block.timestamp);
+            line.endTime = uint40(block.timestamp + _auctionConfig.baseDuration);
+            line.currentWinner = address(0);
+            line.currentPrice = 0;
+        }
+    }
+
+    /**
+     * @return A value that will always be in {1, 2, ..., _auctionConfig.lines}.
+     * So the returned value will always be a valid line number.
+     */
+    function tokenIdToLineNumber(uint24 tokenId) public view returns (uint8) {
+        return uint8(tokenId - 1 % _auctionConfig.lines) + 1;
     }
 
 }
