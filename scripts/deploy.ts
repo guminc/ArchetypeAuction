@@ -4,10 +4,10 @@ import { parallelAutoAuction } from "./helpers"
 const figmataMinimalDeployment = async () => {
     const { nft, auction, deployer } = await parallelAutoAuction({
         auctionsAtSameTime: 10,
-        startingPrice: 0.1,
-        bidIncrement: 0.05,
-        auctionDuration: 4 * 60 * 60, // 4 hours
-        extraAuctionTime: 5 * 60, // 5 mins 
+        startingPrice: 0.01,
+        bidIncrement: 0.005,
+        auctionDuration: 60 * 3, // 3 mins
+        extraAuctionTime: 60, // 1 min
         mainnet: true
     })
 

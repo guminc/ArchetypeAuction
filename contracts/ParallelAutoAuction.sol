@@ -149,7 +149,7 @@ contract ParallelAutoAuction is IParallelAutoAuction {
         for (uint8 i = 0; i < _auctionConfig.lines; i++)
             lines[i] = _lineState(i+1);
     }
-
+    
     function _lineState(uint24 tokenId) private view returns (LineState memory line) {
         uint8 lineNumber = tokenIdToLineNumber(tokenId);
         line = _lineToState[lineNumber];
@@ -168,7 +168,7 @@ contract ParallelAutoAuction is IParallelAutoAuction {
      * So the returned value will always be a valid line number.
      */
     function tokenIdToLineNumber(uint24 tokenId) public view returns (uint8) {
-        return uint8(tokenId - 1 % _auctionConfig.lines) + 1;
+        return uint8((tokenId - 1) % _auctionConfig.lines) + 1;
     }
 
 }
