@@ -185,6 +185,25 @@ describe('ParallelAutoAuction', async () => {
         )
     })
 
+    it('should trigger next auction when calling settleAuction', async () => {
+        const expectedIdsLen = 2
+        const idToBid = 2
+
+        const { auction, nft, user } = await parallelAutoAuction({
+            auctionsAtSameTime: expectedIdsLen,
+            auctionDuration: 1,
+            extraAuctionTime: 0,
+        })
+
+        const bid = mkMinBid(auction)(user)
+        await bid(idToBid)()
+        await sleep(2)
+        await auction.settleAuction(idToBid)
+
+        expect(await nft.balanceOf(user.address)).to.equals(1)
+        expect(await auction.getMinPriceFor(4)).to.equals(toWei(0.1)) // starting price - auction for 4 should have started
+    })
+
     it('should use right min price over different ids', async () => {
         expect(1).equals(2)
         // TODO

@@ -76,12 +76,15 @@ contract ParallelAutoAuction is IParallelAutoAuction {
     }
 
     function settleAuction(uint24 nftId) external {
-        LineState memory line = _lineToState[tokenIdToLineNumber(nftId)];
+        uint8 lineNumber = tokenIdToLineNumber(nftId);
+        LineState storage line = _lineToState[lineNumber];
         IExternallyMintable token = IExternallyMintable(_auctionConfig.auctionedNft);
         require(block.timestamp > line.endTime, "Auction still ongoing.");
         require(line.head != 0, "Auction not started.");
         require(!token.exists(nftId), "Token already settled.");
+
         _settleAuction(line);
+        _updateLine(line, lineNumber);
     }
 
     function _settleAuction(LineState memory line) private {
