@@ -9,6 +9,14 @@ const privateKey = process.env.PRIVATE_KEY || "";
 const config: HardhatUserConfig = {
     solidity: '0.8.18',
     defaultNetwork: 'hardhat',
+    gasReporter: {
+        enabled: true,
+        coinmarketcap: process.env.CMC_API_KEY,
+        outputFile: 'gasReports'
+    },
+    etherscan: {
+        apiKey: process.env.ETHERSCAN_KEY
+    },
     networks: {
         hardhat: {
             mining: {

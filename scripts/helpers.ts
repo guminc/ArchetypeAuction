@@ -105,6 +105,9 @@ export const getNextId = async (auction: AutoAuction): Promise<number> => {
 export const getLastTimestamp = async () =>
     (await ethers.provider.getBlock('latest')).timestamp
 
+/**
+ * @returns The ETH balance in `contract`.
+ */
 export const getContractBalance = async (contract: Contract): Promise<BigNumber> =>
     await ethers.provider.getBalance(contract.address)
 
@@ -157,7 +160,7 @@ export const parallelAutoAuction = async ({
     const NftFactory = await ethers.getContractFactory('MinimalAuctionableNFT')
     const [deployer, ] = await ethers.getSigners()
     
-    const user = mainnet ? undefined : await getRandomFundedAccount()
+    const user = mainnet ? deployer : await getRandomFundedAccount()
 
     const nft = await NftFactory.connect(deployer).deploy('TestNft', 'TEST')
 
@@ -176,8 +179,5 @@ export const parallelAutoAuction = async ({
         nft, auction, deployer, user
     }
 }
-
-type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
-export type LineState = UnwrapPromise<ReturnType<ParallelAutoAuction['lineToState']>>
 
 

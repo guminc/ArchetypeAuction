@@ -9,8 +9,11 @@ error WrongTokenId();
 error WrongBidAmount();
 error AuctionPaused();
 
+
 contract ParallelAutoAuction is IParallelAutoAuction {
     
+    event Bid(uint24 id);
+
     // @notice The config for the auction should be immutable.
     AuctionConfig private _auctionConfig;
 
@@ -68,6 +71,8 @@ contract ParallelAutoAuction is IParallelAutoAuction {
 
         line.currentPrice = uint96(msg.value);
         line.currentWinner = msg.sender;
+
+        emit Bid(nftId);
         
         uint40 extendedTime = uint40(block.timestamp + _auctionConfig.timeBuffer);
         if (extendedTime > line.endTime)

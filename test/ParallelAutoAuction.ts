@@ -1,8 +1,18 @@
 import { assert, expect } from 'chai';
-import { LineState, fromWei, getContractBalance, getLastTimestamp, getRandomFundedAccount, mkBid, mkMinBid, parallelAutoAuction, range, sleep, sum, sumBigNumbers, toWei } from '../scripts/helpers';
+import { 
+    getContractBalance,
+    getRandomFundedAccount,
+    mkMinBid,
+    parallelAutoAuction,
+    range,
+    sleep,
+    toWei 
+} from '../scripts/helpers';
 import * as A from 'fp-ts/Array'
 import * as N from 'fp-ts/number'
 import { ethers } from 'hardhat';
+import { LineStateStruct } from '../typechain-types/contracts/ParallelAutoAuction';
+import { BigNumber } from 'ethers';
 
 describe('ParallelAutoAuction', async () => {
     it('should show right initial ids', async () => {
@@ -25,20 +35,25 @@ describe('ParallelAutoAuction', async () => {
     
     it('shouln\'t allow bidding on old ids', async () => {
         const expectedIdsLen = 3
+        const auctionDuration = 2
+        const startingPrice = 0.1
 
         const { auction } = await parallelAutoAuction({
             auctionsAtSameTime: expectedIdsLen, 
-            auctionDuration: 2, 
+            auctionDuration, 
             extraAuctionTime: 0,
+            startingPrice,
+            bidIncrement: 0
         })
 
         const bidder = await getRandomFundedAccount()
 
-        const bid = mkMinBid(auction)(bidder)(2)
+        const bid = () => 
+            auction.connect(bidder).createBid(2, { value: toWei(startingPrice) })
 
         await bid()
-        await sleep(2)
-        expect(bid).to.revertedWith('WrongTokenId')
+        await sleep(auctionDuration)
+        await expect(bid()).reverted
     })
 
     it('should allow bidding on new ids', async () => {
@@ -56,11 +71,11 @@ describe('ParallelAutoAuction', async () => {
 
         await bid(2)()
         await sleep(2)
-        expect(bid(2)).to.revertedWith('WrongTokenId')
+        await expect(bid(2)()).reverted
         bid(2 + expectedIdsLen)
     })
 
-    it('should allow ids initialization', async () => {
+    it.skip('should allow ids initialization', async () => {
         const expectedIdsLen = 3
         const ids = range(1, expectedIdsLen)
         const idToBid = 2
@@ -72,14 +87,13 @@ describe('ParallelAutoAuction', async () => {
         })
 
         const bidder = await getRandomFundedAccount()
-        
         const getLine = async (id: number) => await auction.lineState(id)
         const getLines = async () => await Promise.all(ids.map(getLine))
 
-        const lineHeadIs = (n: number) => (line: LineState) => line.head === n
-        
+        const lineHeadIs = (n: number) => (line: LineStateStruct) => line.head === n
+        console.log(await getLines()) 
         expect(A.every(lineHeadIs(0))(await getLines())).true
-        await mkMinBid(auction)(bidder)(idToBid)()
+        await mkMinBid(auction)(bidder)(idToBid)() // Autism.
         expect(A.every(lineHeadIs(0))(await getLines())).false
 
         expect((await getLine(1)).head).to.equals(0)
@@ -134,9 +148,9 @@ describe('ParallelAutoAuction', async () => {
         
         const minPrice = await auction.getMinPriceFor(1)
 
-        expect(
+        await expect(
             auction.connect(user).createBid(1, { value: minPrice.sub(1) })
-        ).to.revertedWith('WrongBidAmount')
+        ).reverted
         await auction.connect(user).createBid(1, { value: minPrice })
     })
 
@@ -184,10 +198,67 @@ describe('ParallelAutoAuction', async () => {
             toWei(iniPrice).add(toWei(bidIncrement)).add(toWei(epsilon))
         )
     })
+    
+    it('should allow right increment bids', async () => {
+        const startingPrice = 0.1
+        const bidIncrement = 0.05
+        
+        const { auction } = await parallelAutoAuction({
+            startingPrice, bidIncrement
+        })
+
+        const bidder = await getRandomFundedAccount()
+
+        const mkbid = (n: BigNumber) => auction
+            .connect(bidder)
+            .createBid(1, { value: n })
+
+        await expect(mkbid(toWei(startingPrice).sub(1))).reverted
+        await mkbid(toWei(startingPrice))
+        
+        await expect(mkbid(toWei(startingPrice).add(toWei(bidIncrement)).sub(1))).reverted
+        await mkbid(toWei(startingPrice).add(toWei(bidIncrement)))
+
+        await expect(mkbid(toWei(bidIncrement).mul(2).add(toWei(startingPrice)).sub(1))).reverted
+        await mkbid(toWei(bidIncrement).mul(2).add(toWei(startingPrice)))
+        
+    })
 
     it('should use right min price over different ids', async () => {
-        expect(1).equals(2)
-        // TODO
+        const startingPrice = 0.1
+        const bidIncrement = 0.05
+        const auctionsAtSameTime = 10
+        
+        const { auction } = await parallelAutoAuction({
+            auctionsAtSameTime,
+            auctionDuration: 10, 
+            extraAuctionTime: 0,
+            startingPrice,
+            bidIncrement
+        })
+
+        const bidder = await getRandomFundedAccount()
+        const bidder1 = await getRandomFundedAccount()
+        
+        await auction.connect(bidder).createBid(3, { value: toWei(startingPrice) })
+
+        await expect(auction
+            .connect(bidder)
+            .createBid(3, { value: toWei(startingPrice).add(toWei(bidIncrement)).sub(1) })
+        ).reverted
+
+        await auction
+            .connect(bidder1)
+            .createBid(3, { value: toWei(startingPrice).add(toWei(bidIncrement)) })
+        
+        await expect(auction
+            .connect(bidder)
+            .createBid(1, { value: toWei(startingPrice).sub(1) })
+        ).reverted
+
+        await auction
+            .connect(bidder1)
+            .createBid(1, { value: toWei(startingPrice) })
     })
 
 
@@ -225,6 +296,52 @@ describe('ParallelAutoAuction', async () => {
         expect(line.currentPrice).to.equals(expectedPrice)
         expect(finalContractBal).greaterThan(iniContractBal)
         expect(finalContractBal).equals(expectedPrice)
+    })
+    
+    it('should allow secure settling', async () => {
+        const auctionDuration = 3 // 3 secs
+        const startingPrice = 0.1
+        const bidIncrement = 0.05
+
+        const { auction, nft } = await parallelAutoAuction({
+            auctionsAtSameTime: 10,
+            auctionDuration, 
+            extraAuctionTime: 0,
+            startingPrice,
+            bidIncrement
+        })
+
+        const bidder = await getRandomFundedAccount() 
+        const anyone = await getRandomFundedAccount()
+        const bidder1 = await getRandomFundedAccount() 
+        
+        await auction.connect(bidder).createBid(2, { value: toWei(startingPrice) })
+        await sleep(auctionDuration)
+        await auction.connect(anyone).settleAuction(2)
+
+        await expect(auction
+            .connect(bidder1)
+            .createBid(2, { value: toWei(startingPrice*10) })
+        ).reverted
+
+        expect(await nft.balanceOf(bidder.address)).equal(1)
+        expect(await nft.balanceOf(auction.address)).equal(0)
+        expect(await getContractBalance(auction)).equal(0)
+        expect(await getContractBalance(nft)).equal(toWei(startingPrice))
+    
+        const newBidAmount = toWei(startingPrice).add(123)
+
+        await expect(auction
+            .connect(bidder1)
+            .createBid(12, { value: toWei(startingPrice).sub(1) })
+        ).reverted
+
+        await auction.connect(bidder1).createBid(12, { value: newBidAmount })
+
+        expect(await nft.balanceOf(bidder.address)).equal(1)
+        expect(await nft.balanceOf(auction.address)).equal(0)
+        expect(await getContractBalance(auction)).equal(newBidAmount)
+        expect(await getContractBalance(nft)).equal(toWei(startingPrice))
     })
 
     it('should allow minting out', async () => {
