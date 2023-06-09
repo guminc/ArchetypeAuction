@@ -156,7 +156,7 @@ export const parallelAutoAuction = async ({
     bidIncrement = 0.05, // 0.05 eth
     mainnet = false
 }) => {
-    const AuctionFactory = await ethers.getContractFactory('ParallelAutoAuction');
+    const AuctionFactory = await ethers.getContractFactory('RewardedParallelAuction');
     const NftFactory = await ethers.getContractFactory('MinimalAuctionableNFT')
     const [deployer, ] = await ethers.getSigners()
     
@@ -164,7 +164,9 @@ export const parallelAutoAuction = async ({
 
     const nft = await NftFactory.connect(deployer).deploy('TestNft', 'TEST')
 
-    const auction = await AuctionFactory.connect(deployer).deploy(
+    const auction = await AuctionFactory.connect(deployer).deploy()
+    
+    await auction.connect(deployer).initialize(
         nft.address,
         auctionsAtSameTime,
         auctionDuration,
