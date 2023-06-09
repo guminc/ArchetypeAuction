@@ -4,30 +4,41 @@ pragma solidity ^0.8.4;
 
 import "./interfaces/IParallelAutoAuction.sol";
 import "./interfaces/IExternallyMintable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 error WrongTokenId();
 error WrongBidAmount();
 error AuctionPaused();
 
+struct StateLocks {
+    bool initializationLocked;
+    bool baseDurationLocked;
+    bool timeBufferLocked;
+    bool startingPriceLocked;
+    bool bidIncrementLocked;
+}
 
-contract ParallelAutoAuction is IParallelAutoAuction {
+contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
     
-    event Bid(uint24 id);
-
     // @notice The config for the auction should be immutable.
     AuctionConfig private _auctionConfig;
+    
+    StateLocks private _stateLocks;
 
     // @notice `_lineToState[i]` should only be mutable from the line `i`. 
     mapping(uint8 => LineState) private _lineToState;
 
-    constructor(
+    function initialize(
         address nftToAuction,
         uint8 lines,
         uint32 baseDuration,
         uint32 timeBuffer,
         uint96 startingPrice,
         uint96 bidIncrement
-    ) {
+    ) external onlyOwner {
+        require(!_stateLocks.initializationLocked); 
+        _stateLocks.initializationLocked = true;
+
         _auctionConfig.auctionedNft = nftToAuction;
         _auctionConfig.lines = lines;
         _auctionConfig.baseDuration = baseDuration;
@@ -176,5 +187,56 @@ contract ParallelAutoAuction is IParallelAutoAuction {
         return uint8((tokenId - 1) % _auctionConfig.lines) + 1;
     }
 
+
+    /* -- General contract state reconfiguration --*/
+    /**
+     * @dev Updating `baseDuration` will only affect to future auctions.
+     */
+    function setBaseDuration(uint32 baseDuration) external onlyOwner {
+        require(!_stateLocks.baseDurationLocked);
+        _auctionConfig.baseDuration = baseDuration;
+    }
+
+    /**
+     * @dev Updating `timeBuffer` will only affect to future bufferings.
+     */
+    function setTimeBuffer(uint32 timeBuffer) external onlyOwner {
+        require(!_stateLocks.timeBufferLocked);
+        _auctionConfig.timeBuffer = timeBuffer; 
+    }
+
+    /**
+     * @dev Updating `startingPrice` will only affect to future auctions.
+     */
+    function setStartingPrice(uint96 startingPrice) external onlyOwner {
+        require(!_stateLocks.startingPriceLocked);
+        _auctionConfig.startingPrice = startingPrice;
+    }
+
+    /**
+     * @dev Updating `bidIncrement` will only affect to future increments.
+     */
+    function setBidIncrement(uint96 bidIncrement) external onlyOwner {
+        require(!_stateLocks.bidIncrementLocked);
+        _auctionConfig.bidIncrement = bidIncrement;
+    }
+
+
+    /* -- General contract state locks -- */
+    function lockBaseDurationForever() external onlyOwner {
+        _stateLocks.baseDurationLocked = true;
+    }
+
+    function lockTimeBufferForever() external onlyOwner {
+        _stateLocks.timeBufferLocked = true;
+    }
+
+    function lockStartingPriceForever() external onlyOwner {
+        _stateLocks.startingPriceLocked = true;
+    }
+
+    function lockBidIncrementForever() external onlyOwner {
+        _stateLocks.bidIncrementLocked = true;
+    }
 }
 

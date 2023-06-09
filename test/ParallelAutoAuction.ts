@@ -344,6 +344,16 @@ describe('ParallelAutoAuction', async () => {
         expect(await getContractBalance(nft)).equal(toWei(startingPrice))
     })
 
+    it('shouldn\'t allow multiple settlement', async () => {
+        expect(1).equals(2)
+        // TODO
+    })
+
+    it('shouldn\'t allow settling wrong ids', async () => {
+        expect(1).equals(2)
+        // TODO
+    })
+
     it('should allow minting out', async () => {
         expect(1).equals(2)
         // TODO
