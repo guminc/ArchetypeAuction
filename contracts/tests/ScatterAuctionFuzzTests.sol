@@ -27,7 +27,7 @@ contract ScatterAuctionFuzzTest is ScatterAuction {
         state.endTime,
         state.timeBuffer
     ) {
-        token.setMinter(address(this));
+        token.addMinter(address(this));
     }
     
     // Invariant: Contract should be immutable.

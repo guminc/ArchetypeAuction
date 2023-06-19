@@ -28,7 +28,7 @@ contract MinimalAuctionableNFT is ERC721, Ownable, IExternallyMintable {
         return _exists(tokenId);
     }
 
-    function setMinter(address minter) external onlyOwner {
+    function addMinter(address minter) external onlyOwner {
         _minter = minter;
     }
 
