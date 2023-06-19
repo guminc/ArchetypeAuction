@@ -44,6 +44,10 @@ contract FigmataAuction is ParallelAutoAuction, ISharesHolder {
         for (uint256 i = 0; i < ids.length; i++) _tokenIdIsVip[ids[i]] = areVip;
     }
 
+    function isVipId(uint24 id) external view returns (bool) {
+        return _tokenIdIsVip[id];
+    }
+
     function setTokenRequiredToHoldToBeVip(address token) external onlyOwner {
         if (options.vipRequiredTokenLocked) revert OptionLocked(); 
         tokenRequiredToOwnToBeVip = token;

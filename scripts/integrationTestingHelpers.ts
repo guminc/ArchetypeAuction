@@ -1,8 +1,17 @@
 import { ethers } from "hardhat";
 import { ConfigStruct } from "../typechain-types/contracts/tokens/PixeladyFigmata";
-import { toWei } from "./helpers";
+import { getRandomFundedAccount, toWei } from "./helpers";
 
-export const figmataIntegrationDeployment = async () => {
+export const figmataIntegrationDeployment = async ({
+    auctionsAtSameTime = 10,
+    auctionDuration = 10,
+    extraAuctionTime = 3,
+    startingPrice = 0.1,
+    bidIncrement = 0.05,
+    maxSupply = 100,
+    ownerAltPayout = ethers.constants.AddressZero,
+    superAffiliatePayout = ethers.constants.AddressZero
+}) => {
     const FigmataAuctionFactory = await ethers.getContractFactory('FigmataAuction')
     const FigmataFactory = await ethers.getContractFactory('PixeladyFigmata')
     // We deploy a fake ERC721 token to test VIP auctions with `FigmataAuction`.
@@ -14,10 +23,10 @@ export const figmataIntegrationDeployment = async () => {
 
     const conf: ConfigStruct = {
         baseUri: 'ipfs://fakeUri',
-        maxSupply: 400,
+        maxSupply,
         platformFee: 500,
-        ownerAltPayout: ethers.constants.AddressZero,
-        superAffiliatePayout: ethers.constants.AddressZero
+        ownerAltPayout,
+        superAffiliatePayout
     }
 
     const figmata = await FigmataFactory.connect(deployer).deploy(
@@ -30,17 +39,19 @@ export const figmataIntegrationDeployment = async () => {
     
     await auction.connect(deployer).initialize(
         figmata.address,
-        10, // Lines
-        100, // Auction duration in secs.
-        10, // Extra duration in secs.
-        toWei(0.1), // Base price.
-        toWei(0.05) // Bid increment.
+        auctionsAtSameTime,
+        auctionDuration,
+        extraAuctionTime,
+        toWei(startingPrice),
+        toWei(bidIncrement)
     )
 
     await auction.connect(deployer).setTokenRequiredToHoldToBeVip(pixelady.address)
     await figmata.connect(deployer).addMinter(auction.address)
+    
+    const user = await getRandomFundedAccount()
 
     return {
-        deployer, pixelady, auction, figmata
+        deployer, pixelady, auction, figmata, user
     }
 }

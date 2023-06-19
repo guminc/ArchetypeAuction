@@ -92,6 +92,10 @@ contract PixeladyFigmata is ERC721Enumerable, Ownable, IExternallyMintable {
         }
     }
 
+    function getPlatform() external pure returns (address) {
+        return PLATFORM;
+    }
+
 
     /* ---------------------------------- *\
     |* IExternallyMintable implementation *|

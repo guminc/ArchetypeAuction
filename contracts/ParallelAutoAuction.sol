@@ -74,10 +74,18 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
             revert WrongTokenId();
         
         /* ------------------ BIDDING LOGIC ------------------ */
-        if (
-            (line.currentPrice == 0 && msg.value < _auctionConfig.startingPrice) ||
+        // This condition will hold true not only if the last line auction 
+        // ended, but also if its the first auction for that line.
+        if (lastLineAuctionEnded && _auctionConfig.startingPrice > msg.value)
+            revert WrongBidAmount();  
+
+        // On the other hand, check if the bid increment is correct. Note that
+        // this condition works because `_auctionConfig.startingPrice > msg.value`
+        // is a weaker condition than the following.
+        else if (
+            line.currentWinner != address(0) &&
             line.currentPrice + _auctionConfig.bidIncrement > msg.value
-        ) revert WrongBidAmount();
+        ) revert WrongBidAmount(); 
 
         if (line.currentPrice != 0)
             SafeTransferLib.forceSafeTransferETH(line.currentWinner, line.currentPrice);
