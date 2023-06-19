@@ -1,4 +1,4 @@
-import { parallelAutoAuction, sleep } from "./helpers"
+import { parallelAutoAuction } from "./helpers"
 
 const figmataTestnetDeployment = async () => {
     const { nft, auction, deployer } = await parallelAutoAuction({
@@ -15,7 +15,6 @@ const figmataTestnetDeployment = async () => {
     console.log(`Nft deployed: ${nft.address}`)
     console.log(`Deployed by: ${deployer.address}`)
 }
-
 
 figmataTestnetDeployment()
     .then(() => process.exit(0))

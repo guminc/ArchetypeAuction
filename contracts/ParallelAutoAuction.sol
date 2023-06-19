@@ -10,6 +10,7 @@ import "solady/src/utils/SafeTransferLib.sol";
 error WrongTokenId();
 error WrongBidAmount();
 error AuctionPaused();
+error OptionLocked();
 
 struct StateLocks {
     bool initializationLocked;
@@ -194,7 +195,7 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
      * @dev Updating `baseDuration` will only affect to future auctions.
      */
     function setBaseDuration(uint32 baseDuration) external onlyOwner {
-        require(!_stateLocks.baseDurationLocked);
+        if (_stateLocks.baseDurationLocked) revert OptionLocked();
         _auctionConfig.baseDuration = baseDuration;
     }
 
@@ -202,7 +203,7 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
      * @dev Updating `timeBuffer` will only affect to future bufferings.
      */
     function setTimeBuffer(uint32 timeBuffer) external onlyOwner {
-        require(!_stateLocks.timeBufferLocked);
+        if (_stateLocks.timeBufferLocked) revert OptionLocked();
         _auctionConfig.timeBuffer = timeBuffer; 
     }
 
@@ -210,7 +211,7 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
      * @dev Updating `startingPrice` will only affect to future auctions.
      */
     function setStartingPrice(uint96 startingPrice) external onlyOwner {
-        require(!_stateLocks.startingPriceLocked);
+        if (_stateLocks.startingPriceLocked) revert OptionLocked();
         _auctionConfig.startingPrice = startingPrice;
     }
 
@@ -218,7 +219,7 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
      * @dev Updating `bidIncrement` will only affect to future increments.
      */
     function setBidIncrement(uint96 bidIncrement) external onlyOwner {
-        require(!_stateLocks.bidIncrementLocked);
+        if (_stateLocks.bidIncrementLocked) revert OptionLocked();
         _auctionConfig.bidIncrement = bidIncrement;
     }
 

@@ -143,7 +143,7 @@ export const auctionFactory = async ({
         extraBidTime
     );
 
-    await nft.setMinter(auction.address)
+    await nft.addMinter(auction.address)
 
     return { auction, nft, bidToken }
 }
@@ -178,7 +178,7 @@ export const parallelAutoAuction = async ({
         toWei(bidIncrement)
     )
     
-    await nft.connect(deployer).setMinter(auction.address)
+    await nft.connect(deployer).addMinter(auction.address)
 
     return {
         nft, auction, deployer, user

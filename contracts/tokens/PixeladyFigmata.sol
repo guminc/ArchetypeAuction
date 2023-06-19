@@ -32,11 +32,12 @@ error OwnershipError();
 
 struct Config {
     string baseUri;
-    address ownerAltPayout; // optional alternative address for owner withdrawals.
-    address superAffiliatePayout; // optional super affiliate address, will receive half of platform fee if set.
+    // optional alternative address for owner withdrawals.
+    address ownerAltPayout; 
+    // optional super affiliate address, will receive half of platform fee if set.
+    address superAffiliatePayout; 
     uint24 maxSupply;
     uint16 platformFee; //BPS
-    uint16 defaultRoyalty; //BPS
 }
 
 struct Options {
@@ -58,33 +59,19 @@ contract PixeladyFigmata is ERC721Enumerable, Ownable, IExternallyMintable {
     mapping (address => bool) private _isMinter;
     
 
-	constructor( string memory name, string memory symbol) ERC721(name, symbol) { }
-
-      ////
-      //// METHODS
-      ////
-      //// TODO check initialize
-      //function initialize(
-      //  string memory name,
-      //  string memory symbol,
-      //  Config calldata config_,
-      //  address _receiver
-      //) external initializerERC721A {
-      //  __ERC721A_init(name, symbol);
-      //  // check max bps not reached and min platform fee.
-      //  if (config_.platformFee > MAXBPS || config_.platformFee < 500) {
-      //    revert InvalidConfig();
-      //  }
-
-      //  config = config_;
-      //  __Ownable_init();
-
-      //  if (config.ownerAltPayout != address(0)) {
-      //    setDefaultRoyalty(config.ownerAltPayout, config.defaultRoyalty);
-      //  } else {
-      //    setDefaultRoyalty(_receiver, config.defaultRoyalty);
-      //  }
-      //}
+	constructor( 
+        string memory name,
+        string memory symbol,
+        Config memory _config
+    ) ERC721(name, symbol) { 
+        if(
+            (bytes(_config.baseUri).length == 0) || 
+            (_config.maxSupply < 1) ||
+            (_config.platformFee > MAXBPS && _config.platformFee < 500)
+        ) revert WrongConfiguration();
+        
+        config = _config;
+    }
 
     function withdraw() external {
         uint256 platformFee = address(this).balance * config.platformFee / 10000;
@@ -199,58 +186,5 @@ contract PixeladyFigmata is ERC721Enumerable, Ownable, IExternallyMintable {
     function lockOwnerAltPayoutForever() external onlyOwner {
         options.ownerAltPayoutLocked = true;
     }
-
-
-  //// OPTIONAL ROYALTY ENFORCEMENT WITH OPENSEA
-  //function enableRoyaltyEnforcement() external onlyOwner {
-  //  if (options.royaltyEnforcementLocked) {
-  //    revert LockedForever();
-  //  }
-  //  _registerForOperatorFiltering();
-  //  options.royaltyEnforcementEnabled = true;
-  //}
-
-  //function disableRoyaltyEnforcement() external onlyOwner {
-  //  if (options.royaltyEnforcementLocked) {
-  //    revert LockedForever();
-  //  }
-  //  options.royaltyEnforcementEnabled = false;
-  //}
-
-  ///// @notice the password is "forever"
-  //function lockRoyaltyEnforcement(string memory password) external onlyOwner {
-  //  if (keccak256(abi.encodePacked(password)) != keccak256(abi.encodePacked("forever"))) {
-  //    revert WrongPassword();
-  //  }
-
-  //  options.royaltyEnforcementLocked = true;
-  //}
-
-  //function _operatorFilteringEnabled() internal view override returns (bool) {
-  //  return options.royaltyEnforcementEnabled;
-  //}
-
-  ////ERC2981 ROYALTY
-  //function supportsInterface(bytes4 interfaceId)
-  //  public
-  //  view
-  //  virtual
-  //  override(ERC721AUpgradeable, ERC2981Upgradeable)
-  //returns (bool)
-  //{
-  //  // Supports the following `interfaceId`s:
-  //  // - IERC165: 0x01ffc9a7
-  //  // - IERC721: 0x80ac58cd
-  //  // - IERC721Metadata: 0x5b5e139f
-  //  // - IERC2981: 0x2a55205a
-  //  return
-  //  ERC721AUpgradeable.supportsInterface(interfaceId) ||
-  //    ERC2981Upgradeable.supportsInterface(interfaceId);
-  //}
-
-  //function setDefaultRoyalty(address receiver, uint16 feeNumerator) public onlyOwner {
-  //  config.defaultRoyalty = feeNumerator;
-  //  _setDefaultRoyalty(receiver, feeNumerator);
-  //}
 
 }
