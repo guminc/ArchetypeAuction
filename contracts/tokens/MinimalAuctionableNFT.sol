@@ -11,7 +11,13 @@ contract MinimalAuctionableNFT is ERC721, Ownable, IExternallyMintable {
 
     address internal _minter;
 
-	constructor(string memory name, string memory symbol) ERC721(name, symbol) {}
+    uint24 _maxSupply;
+
+	constructor(
+        string memory name, string memory symbol, uint24 maxSupply_
+    ) ERC721(name, symbol) {
+        _maxSupply = maxSupply_;
+    }
     
     // -- IExternallyMintable realization -- //
     function mint(uint24 tokenId, address to) external onlyMinter {
@@ -34,8 +40,8 @@ contract MinimalAuctionableNFT is ERC721, Ownable, IExternallyMintable {
         return minter == _minter; 
     }
 
-    function maxSupply() external pure returns (uint24) {
-        return 10000;
+    function maxSupply() external view returns (uint24) {
+        return _maxSupply;
     }
 
     // -- State and helpers -- //

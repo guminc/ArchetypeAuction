@@ -118,6 +118,31 @@ describe('ParallelAutoAuction', async () => {
 
         expect(await nft.balanceOf(user.address)).to.equals(1)
     })
+    
+    it('should allow refunds on outbids', async () => {
+        const startingPrice = 0.1 
+        const bidIncrement = 0.05
+
+        const { auction } = await parallelAutoAuction({
+            startingPrice, bidIncrement
+        })
+        
+        const user = await getRandomFundedAccount()
+        const outBidder = await getRandomFundedAccount()
+        const iniBal = await user.getBalance()
+        
+        await auction.connect(user).createBid(1, {
+            value: toWei(startingPrice) 
+        })
+        await auction.connect(outBidder).createBid(1, {
+            value: toWei(startingPrice).add(toWei(bidIncrement)) 
+        })
+
+        const newBal = await user.getBalance()
+    
+        expect(iniBal).approximately(newBal, toWei(0.005))
+        
+    })
 
     it('should store winner balance securely', async () => {
         const expectedIdsLen = 3

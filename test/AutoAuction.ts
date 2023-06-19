@@ -136,7 +136,7 @@ describe('AutoAuction', () => {
             reservePrice: 0.01,
             bidIncrement: 0.005,
             auctionDuration: 5,
-            extraBidTime: 3,
+            extraBidTime: 4,
             maxSupply: 5
         })
 
@@ -165,6 +165,7 @@ describe('AutoAuction', () => {
         // to keep bidding because of `extraBidTime`.
         for (let i = 0.1; i < 0.15; i += 0.005) {
             await mkbid(bidder2, 2, i)
+            const d = await auction.auctionData()
             await sleep(1)
         }
         

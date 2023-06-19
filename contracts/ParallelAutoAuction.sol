@@ -5,6 +5,7 @@ pragma solidity ^0.8.4;
 import "./interfaces/IParallelAutoAuction.sol";
 import "./interfaces/IExternallyMintable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "solady/src/utils/SafeTransferLib.sol";
 
 error WrongTokenId();
 error WrongBidAmount();
@@ -78,7 +79,7 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
         ) revert WrongBidAmount();
 
         if (line.currentPrice != 0)
-            payable(line.currentWinner).transfer(line.currentPrice);
+            SafeTransferLib.forceSafeTransferETH(line.currentWinner, line.currentPrice);
 
         line.currentPrice = uint96(msg.value);
         line.currentWinner = msg.sender;

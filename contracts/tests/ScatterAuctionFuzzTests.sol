@@ -8,7 +8,7 @@ import "../tokens/MinimalAuctionableNFT.sol";
 contract ScatterAuctionFuzzTest is ScatterAuction {
     
 
-    MinimalAuctionableNFT token = new MinimalAuctionableNFT("Test", "TEST");
+    MinimalAuctionableNFT token = new MinimalAuctionableNFT("Test", "TEST", 30);
 
     AuctionState public state = AuctionState(
         address(token),
