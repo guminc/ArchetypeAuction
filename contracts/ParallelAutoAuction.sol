@@ -41,6 +41,8 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
         require(!_stateLocks.initializationLocked); 
         _stateLocks.initializationLocked = true;
 
+        require(bidIncrement > 0);
+
         _auctionConfig.auctionedNft = nftToAuction;
         _auctionConfig.lines = lines;
         _auctionConfig.baseDuration = baseDuration;

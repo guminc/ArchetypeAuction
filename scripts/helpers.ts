@@ -6,11 +6,21 @@ import { BigNumber, Contract, ContractTransaction } from 'ethers';
 import { ParallelAutoAuction } from '../typechain-types/contracts/ParallelAutoAuction'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import * as RNEA from 'fp-ts/ReadonlyNonEmptyArray'
+import * as A from 'fp-ts/Array'
+import { pipe } from 'fp-ts/lib/function';
 
 /* -- Utility pure functions -- */
 // TODO note that some of those functions are dupes of 
 // scatter-art/ArchetypeERC20/scripts/helpers.ts, so they
 // should get decoupled to an unique module.
+
+export const cartesian = <T,U>(as: T[], bs: U[]) => pipe(
+    as, A.flatMap(a => pipe(
+        bs,
+        A.map(b => [a, b])
+    ))
+);
+
 export const randomAddress = () => `0x${[...Array(40)]
     .map(() => Math.floor(Math.random() * 16).toString(16))
     .join('')}`;

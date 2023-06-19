@@ -1,6 +1,8 @@
 import { assert, expect } from 'chai';
 import { 
+    cartesian,
     getContractBalance,
+    getLastTimestamp,
     getRandomFundedAccount,
     mkMinBid,
     parallelAutoAuction,
@@ -12,7 +14,8 @@ import * as A from 'fp-ts/Array'
 import * as N from 'fp-ts/number'
 import { ethers } from 'hardhat';
 import { LineStateStruct } from '../typechain-types/contracts/ParallelAutoAuction';
-import { BigNumber } from 'ethers';
+import { BigNumber, ContractTransaction } from 'ethers';
+import { pipe } from 'fp-ts/lib/function';
 
 describe('ParallelAutoAuction', async () => {
     it('should show right initial ids', async () => {
@@ -369,19 +372,142 @@ describe('ParallelAutoAuction', async () => {
         expect(await getContractBalance(nft)).equal(toWei(startingPrice))
     })
 
-    it('shouldn\'t allow multiple settlement', async () => {
-        expect(1).equals(2)
-        // TODO
+    it('shouldn\'t allow zero bid increments', async () => {
+        const startingPrice = 0.01
+        const bidIncrement = 0
+
+        await expect(parallelAutoAuction({
+            auctionsAtSameTime: 1, startingPrice, bidIncrement
+        })).reverted
     })
 
-    it('shouldn\'t allow settling wrong ids', async () => {
-        expect(1).equals(2)
-        // TODO
+    it('should allow bid incrementing on free bids', async () => {
+        const startingPrice = 0
+        const bidIncrement = 0.01
+
+        const { auction, nft, user } = await parallelAutoAuction({
+            auctionsAtSameTime: 1, startingPrice, bidIncrement,
+            extraAuctionTime: 5
+        })
+        
+        const mkbid = (n: BigNumber) => auction.connect(user).createBid(1, { value: n })
+
+        await mkbid(toWei(0))
+        await expect(mkbid(toWei(0))).reverted
+
+        const rangedBids = async (n: BigNumber) => {
+            await expect(mkbid(n.sub(1))).reverted
+            await mkbid(n)
+            await expect(mkbid(n)).reverted
+            await expect(mkbid(n.add(1))).reverted
+        }
+
+        await rangedBids(toWei(bidIncrement))
+        await rangedBids(toWei(bidIncrement).mul(2))
+        await rangedBids(toWei(bidIncrement).mul(3))
+    })
+    
+    const rangedBidsBuilder = (
+        biddingFunction: (n: BigNumber) => Promise<ContractTransaction>
+    ) => async (n: BigNumber) => {
+        await expect(biddingFunction(n.sub(1))).reverted
+        await biddingFunction(n)
+        await expect(biddingFunction(n)).reverted
+        await expect(biddingFunction(n.add(1))).reverted
+    }
+
+    it('should allow bid incrementing normal bid', async () => {
+        const startingPrices = [0.01, 0.1, 0.005, 0.0005]
+        const bidIncrements = [0.0099, 0.005, 0.01001, 0.02, 0.0005]
+        
+        const prod = cartesian(startingPrices, bidIncrements)
+
+        for (const [startingPrice, bidIncrement] of prod) {
+
+            const { auction, user } = await parallelAutoAuction({
+                auctionsAtSameTime: 1, startingPrice, bidIncrement,
+                extraAuctionTime: 5
+            })
+            
+            const mkbid = (n: BigNumber) => auction.connect(user).createBid(1, { value: n })
+            const rangedBids = rangedBidsBuilder(mkbid) 
+
+            await expect(mkbid(toWei(0))).reverted
+            await expect(toWei(startingPrice).sub(1)).reverted
+            await mkbid(toWei(startingPrice))
+
+            await rangedBids(toWei(startingPrice).add(toWei(bidIncrement)))
+            await rangedBids(toWei(bidIncrement).mul(2).add(toWei(startingPrice)))
+            await rangedBids(toWei(bidIncrement).mul(3).add(toWei(startingPrice)))
+
+        }
+
     })
 
-    it('should allow minting out', async () => {
-        expect(1).equals(2)
-        // TODO
+    it('should allow bid incrementing normal bid with fuzzing', async () => {
+        const startingPrices = [0.01, 0.1, 0.005, 0.0005]
+        const bidIncrements = [0.0099, 0.005, 0.01001, 0.02, 0.0005]
+        
+        const prod = cartesian(startingPrices, bidIncrements)
+
+        for (const [startingPrice, bidIncrement] of prod) {
+            console.log(`${startingPrice} x ${bidIncrement}`)
+
+            const { auction, user } = await parallelAutoAuction({
+                auctionsAtSameTime: 1,
+                startingPrice,
+                bidIncrement,
+                auctionDuration: 100,
+                extraAuctionTime: 5
+            })
+
+            const hacker = await getRandomFundedAccount()
+            const iniHackerBal = await hacker.getBalance()
+            const iniBal = await user.getBalance()
+
+            const fuzzer = async () => { try {
+                const bid = auction.connect(hacker).createBid(
+                    1, { value: (await auction.getMinPriceFor(1)).sub(1) }
+                )
+                await bid
+                await auction.connect(hacker).settleAuction(0)
+                await bid
+                await auction.connect(hacker).settleAuction(1)
+                await bid
+                await auction.connect(hacker).settleAuction(2)
+                await bid
+            } catch {}}
+            
+            const mkbid = (n: BigNumber) => auction.connect(user).createBid(1, { value: n })
+            const rangedBids = rangedBidsBuilder(mkbid) 
+            
+            await expect(mkbid(toWei(0))).reverted
+            await expect(mkbid(toWei(startingPrice).sub(1))).reverted
+            await fuzzer()
+
+            await mkbid(toWei(startingPrice))
+            await fuzzer()
+
+            await rangedBids(toWei(startingPrice).add(toWei(bidIncrement)))
+            await fuzzer()
+            
+            await rangedBids(toWei(bidIncrement).mul(2).add(toWei(startingPrice)))
+            await fuzzer()
+
+            const lastBid = toWei(bidIncrement).mul(3).add(toWei(startingPrice))
+            await rangedBids(lastBid)
+            await fuzzer()
+
+            expect(await hacker.getBalance()).lessThan(iniHackerBal)
+            const line = await auction.lineState(1)
+            expect(line.currentWinner).equal(user.address)
+            expect(line.currentPrice).equal(lastBid)
+            expect(await getContractBalance(auction)).equal(lastBid)
+            expect(await user.getBalance()).approximately(
+                iniBal.sub(lastBid), toWei(0.001)
+            );
+        }
+
     })
 
 });
