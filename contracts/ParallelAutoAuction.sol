@@ -59,35 +59,26 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
         
         uint8 lineNumber = tokenIdToLineNumber(nftId);
         LineState storage line = _lineToState[lineNumber];
-        bool lastLineAuctionEnded = block.timestamp > line.endTime;
         IExternallyMintable token = IExternallyMintable(_auctionConfig.auctionedNft);
         
         if (!token.isMinter(address(this)))
             revert AuctionPaused();
 
         /* ---------- AUCTION UPDATING AND SETTLEMENT ---------- */
-        if (lastLineAuctionEnded && !token.exists(line.head) && line.head > 0)
-            _settleAuction(line);
-        
-        if (line.head == 0 || lastLineAuctionEnded)
+        if (block.timestamp > line.endTime) {
+            if (!token.exists(line.head) && line.head > 0) _settleAuction(line);
             _updateLine(line, lineNumber);
+        }
 
         if (line.head != nftId || nftId > token.maxSupply())
             revert WrongTokenId();
         
         /* ------------------ BIDDING LOGIC ------------------ */
-        // This condition will hold true not only if the last line auction 
-        // ended, but also if its the first auction for that line.
-        if (lastLineAuctionEnded && _auctionConfig.startingPrice > msg.value)
-            revert WrongBidAmount();  
-
-        // On the other hand, check if the bid increment is correct. Note that
-        // this condition works because `_auctionConfig.startingPrice > msg.value`
-        // is a weaker condition than the following.
-        else if (
-            line.currentWinner != address(0) &&
-            line.currentPrice + _auctionConfig.bidIncrement > msg.value
-        ) revert WrongBidAmount(); 
+        bool winnerExists = line.currentWinner != address(0);
+        if (
+            (!winnerExists && _auctionConfig.startingPrice > msg.value) ||
+            (winnerExists && line.currentPrice + _auctionConfig.bidIncrement > msg.value)
+        ) revert WrongBidAmount();
 
         if (line.currentPrice != 0)
             SafeTransferLib.forceSafeTransferETH(line.currentWinner, line.currentPrice);
@@ -132,8 +123,13 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
     function _updateLine(LineState storage line, uint8 lineNumber) private {
         line.startTime = uint40(block.timestamp);
         line.endTime = uint40(block.timestamp + _auctionConfig.baseDuration);
-        line.head += line.head == 0 ? lineNumber : _auctionConfig.lines;
-        line.currentPrice = 0;
+
+        if (line.head == 0) line.head += lineNumber; 
+        else {
+            line.head += _auctionConfig.lines;
+            line.currentPrice = 0;
+            line.currentWinner = address(0);
+        }
     }
 
 
@@ -182,7 +178,7 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
         uint8 lineNumber = tokenIdToLineNumber(tokenId);
         line = _lineToState[lineNumber];
         
-        if (line.head == 0 || block.timestamp > line.endTime) {
+        if (block.timestamp > line.endTime) {
             line.head += line.head == 0 ? lineNumber : _auctionConfig.lines;
             line.startTime = uint40(block.timestamp);
             line.endTime = uint40(block.timestamp + _auctionConfig.baseDuration);

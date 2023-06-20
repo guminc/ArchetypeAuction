@@ -62,23 +62,23 @@ describe('FigmataAuction', async () => {
         const expectedIdsLen = 3
         const auctionDuration = 2
         const startingPrice = 0.1
+        const bidIncrement = 0.05
 
         const { auction } = await figmataIntegrationDeployment({
             auctionsAtSameTime: expectedIdsLen, 
             auctionDuration, 
             extraAuctionTime: 0,
             startingPrice,
-            bidIncrement: 0
+            bidIncrement
         })
 
         const bidder = await getRandomFundedAccount()
 
-        const bid = () => 
-            auction.connect(bidder).createBid(2, { value: toWei(startingPrice) })
-
-        await bid()
+        await auction.connect(bidder).createBid(2, { value: toWei(startingPrice) })
         await sleep(auctionDuration)
-        await expect(bid()).reverted
+        await expect(auction.connect(bidder).createBid(
+            2, { value: toWei(startingPrice).add(toWei(bidIncrement)) }
+        )).reverted
     })
 
     it('should allow bidding on new ids', async () => {
@@ -439,6 +439,33 @@ describe('FigmataAuction', async () => {
         
         // Won't revert because `721 % auctionsAtSameTime == 721 % 10 == 1`!
         await auction.settleAuction(721)
+    })
+
+    it('should allow bidding on high ids', async () => {
+        const { auction, user, figmata } = await figmataIntegrationDeployment({
+            auctionsAtSameTime: 255,
+            maxSupply: 765,
+            startingPrice: 0.01,
+            auctionDuration: 2
+        })
+    
+        const auctionsBundle = async (n: number) => {
+            await auction.connect(user).createBid(n-254, { value: toWei(0.01) })
+            await auction.connect(user).createBid(n, { value: toWei(0.01) })
+            await expect(
+                auction.connect(user).createBid(n-255, { value: toWei(0.01).mul(10) })
+            ).reverted
+            await expect(
+                auction.connect(user).createBid(n+1, { value: toWei(0.01).mul(10) })
+            ).reverted
+        }
+
+        await auctionsBundle(255)
+        await auctionsBundle(255*2)
+        await auctionsBundle(255*3)
+        expect(await figmata.balanceOf(user.address)).equal(4)
+        expect(await getContractBalance(figmata)).equal(toWei(0.01).mul(4))
+        expect(await getContractBalance(auction)).equal(toWei(0.01).mul(2))
     })
 
 });

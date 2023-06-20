@@ -1,7 +1,9 @@
 import { expect } from 'chai';
 import { ethers } from 'hardhat';
 import { figmataIntegrationDeployment } from '../scripts/integrationTestingHelpers';
-import { getContractBalance, getRandomAccount, getRandomFundedAccount, sleep, toWei } from '../scripts/helpers';
+import { fromWei, getContractBalance, getLastTimestamp, getRandomAccount, getRandomFundedAccount, sleep, toWei } from '../scripts/helpers';
+import { BigNumber } from 'ethers';
+import { FigmataAuction__factory } from '../typechain-types';
 
 describe('FigmataIntegration', async () => {
 
@@ -187,9 +189,162 @@ describe('FigmataIntegration', async () => {
 
     })
 
-    it('should allow minting out', async () => {
-        expect(1).equals(2)
-        // TODO
+    it.only('should allow minting out', async () => {
+        const auctionsAtSameTime = 3
+        const auctionDuration = 30
+        const extraAuctionTime = 10
+        const startingPrice = toWei(0)
+        const bidIncrement = toWei(0.025)
+        const maxSupply = 12
+
+        const { 
+            auction, figmata, user
+        } = await figmataIntegrationDeployment({
+            auctionsAtSameTime,
+            auctionDuration,
+            extraAuctionTime,
+            startingPrice: Number(fromWei(startingPrice)),
+            bidIncrement: Number(fromWei(bidIncrement)),
+            maxSupply
+        })
+        
+        const bidForId = new Array<BigNumber>(13)
+
+        const randombid = async (id: number, value: BigNumber) => {
+            const line = await auction.lineState(id)
+            const iniAuctionBal = await getContractBalance(auction)
+            const bidder = await getRandomFundedAccount()
+
+            bidForId[id] = value
+            await auction.connect(bidder).createBid(id, { value })
+            
+            expect(await getContractBalance(auction)).equal(
+                iniAuctionBal.add(value).sub(line.currentPrice)
+            )
+            
+            const balIncrement = line.currentWinner === ethers.constants.AddressZero 
+                ? startingPrice
+                : bidIncrement
+
+            expect(line.currentPrice.add(value)).greaterThanOrEqual(
+                line.currentPrice.add(balIncrement)
+            )
+        }
+
+        const trysettle = async (id: number) => {
+            const hacker = await getRandomFundedAccount()
+            await expect(auction.connect(hacker).settleAuction(id)).reverted
+        }
+    
+        const settle = async (id: number) => {
+            const line = await auction.lineState(id)
+            const iniContractBal = await getContractBalance(figmata)
+            const iniWinnerBal = await figmata.balanceOf(line.currentWinner)
+
+            await auction
+                .connect(await getRandomFundedAccount())
+                .settleAuction(id)
+            
+            expect(await getContractBalance(figmata)).equal(
+                iniContractBal.add(line.currentPrice)
+            )
+
+            expect(await figmata.balanceOf(line.currentWinner)).equal(
+                iniWinnerBal.add(1)
+            )
+        }
+
+        const trybid = async (id: number, value: BigNumber | 'max') => {
+            const hacker = await getRandomFundedAccount()
+            const gasPrice = toWei(0.01)
+            const bidAmount = value === 'max'
+                ? (await hacker.getBalance()).sub(gasPrice) 
+                : value
+
+            await expect(auction.connect(hacker).createBid(
+                id, { value: bidAmount }
+            )).reverted
+        }
+
+        const miniFuzzer = async () => {
+            const promises: Promise<any>[] = [];
+
+            [1,2,3].map(async (id: number) => {
+                const line = await auction.lineState(id)
+
+                if (line.currentWinner !== ethers.constants.AddressZero)
+                    promises.push(trysettle(line.head))
+
+                if (line.currentPrice.eq(0)) {
+                    if (startingPrice.gt(0)) 
+                        promises.push(trybid(line.head, startingPrice.sub(1)))
+                } else
+                    promises.push(trybid(line.head, line.currentPrice.add(bidIncrement).sub(1)))
+
+                if (line.head > 3)
+                    promises.push(trybid(line.head-3, 'max'))
+                promises.push(trybid(line.head+3, 'max'))
+            })
+
+            await Promise.all(promises)
+        }
+
+
+        const waitToEnd = async (id: number) => {
+            const promises: Promise<any>[] = []
+            while (true) {
+                const line = await auction.lineState(id)
+                if (line.head !== id) break
+                await sleep(0.5)
+                promises.push(miniFuzzer())
+            }
+            await Promise.all(promises)
+        }
+
+        const waitToAlmostEnd = async (id: number) => {
+            const t = await getLastTimestamp()
+            const line = await auction.lineState(id)
+
+            if (t + 6 >= line.endTime) return
+            await sleep(0.5)
+            await waitToAlmostEnd(id)
+        }
+
+        const fstLineComputations = async () => {
+            await miniFuzzer() 
+            await randombid(1, startingPrice)
+            await miniFuzzer() 
+            await randombid(1, bidForId[1].add(bidIncrement))
+            await miniFuzzer() 
+            await randombid(1, bidForId[1].add(bidIncrement).add(123))
+            await miniFuzzer() 
+            await waitToAlmostEnd(1)
+            await randombid(1, bidForId[1].add(bidIncrement))
+            await miniFuzzer() 
+            await Promise.all([
+                miniFuzzer(),
+                waitToEnd(1),
+                miniFuzzer()
+            ])
+            await miniFuzzer()
+            await randombid(4, startingPrice.add(bidIncrement).sub(1)) // Fails!
+            await miniFuzzer()
+        }
+
+        const sndLineComputations = async () => {
+            
+        }
+
+        const thdLineComputations = async () => {
+            
+        }
+        
+        await Promise.all([
+            fstLineComputations(),
+            sndLineComputations(),
+            thdLineComputations()
+        ])
+
     })
 
 });

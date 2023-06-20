@@ -178,7 +178,6 @@ export const parallelAutoAuction = async ({
     )
 
     const auction = await AuctionFactory.connect(deployer).deploy()
-    
     await auction.connect(deployer).initialize(
         nft.address,
         auctionsAtSameTime,

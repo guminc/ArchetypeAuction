@@ -2,7 +2,6 @@ import { assert, expect } from 'chai';
 import { 
     cartesian,
     getContractBalance,
-    getLastTimestamp,
     getRandomFundedAccount,
     mkMinBid,
     parallelAutoAuction,
@@ -15,7 +14,6 @@ import * as N from 'fp-ts/number'
 import { ethers } from 'hardhat';
 import { LineStateStruct } from '../typechain-types/contracts/ParallelAutoAuction';
 import { BigNumber, ContractTransaction } from 'ethers';
-import { pipe } from 'fp-ts/lib/function';
 
 describe('ParallelAutoAuction', async () => {
     it('should show right initial ids', async () => {
@@ -40,23 +38,23 @@ describe('ParallelAutoAuction', async () => {
         const expectedIdsLen = 3
         const auctionDuration = 2
         const startingPrice = 0.1
+        const bidIncrement = 0.05
 
         const { auction } = await parallelAutoAuction({
             auctionsAtSameTime: expectedIdsLen, 
             auctionDuration, 
             extraAuctionTime: 0,
             startingPrice,
-            bidIncrement: 0
+            bidIncrement
         })
 
         const bidder = await getRandomFundedAccount()
 
-        const bid = () => 
-            auction.connect(bidder).createBid(2, { value: toWei(startingPrice) })
-
-        await bid()
+        await auction.connect(bidder).createBid(2, { value: toWei(startingPrice) })
         await sleep(auctionDuration)
-        await expect(bid()).reverted
+        await expect(auction.connect(bidder).createBid(
+            2, { value: toWei(startingPrice).add(toWei(bidIncrement)) }
+        )).reverted
     })
 
     it('should allow bidding on new ids', async () => {
@@ -423,7 +421,6 @@ describe('ParallelAutoAuction', async () => {
         const prod = cartesian(startingPrices, bidIncrements)
 
         for (const [startingPrice, bidIncrement] of prod) {
-
             const { auction, user } = await parallelAutoAuction({
                 auctionsAtSameTime: 1, startingPrice, bidIncrement,
                 extraAuctionTime: 5
@@ -433,7 +430,7 @@ describe('ParallelAutoAuction', async () => {
             const rangedBids = rangedBidsBuilder(mkbid) 
 
             await expect(mkbid(toWei(0))).reverted
-            await expect(toWei(startingPrice).sub(1)).reverted
+            await expect(mkbid(toWei(startingPrice).sub(1))).reverted
             await mkbid(toWei(startingPrice))
 
             await rangedBids(toWei(startingPrice).add(toWei(bidIncrement)))
@@ -451,7 +448,6 @@ describe('ParallelAutoAuction', async () => {
         const prod = cartesian(startingPrices, bidIncrements)
 
         for (const [startingPrice, bidIncrement] of prod) {
-            console.log(`${startingPrice} x ${bidIncrement}`)
 
             const { auction, user } = await parallelAutoAuction({
                 auctionsAtSameTime: 1,
@@ -508,6 +504,12 @@ describe('ParallelAutoAuction', async () => {
             );
         }
 
+    })
+
+    it('shouldn\'t be able to settle nothing', async () => {
+        const { auction } = await parallelAutoAuction({ })
+        const hacker = await getRandomFundedAccount()
+        await expect(auction.connect(hacker).settleAuction(1)).reverted
     })
 
 });
