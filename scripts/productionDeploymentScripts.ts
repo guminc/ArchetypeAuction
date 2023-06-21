@@ -77,7 +77,7 @@ const productionDeployment = async () => {
     const maxSupply = 360
     const altPayoutPipeline = '0x6a6d59af77e75c5801bad3320729b81e888b5f09'
     const vipIds = [ 
-        1, 7, 51, 55, 171, 81, 114, 180, 230, 211, 210, 17, 179, 247, 288, 308, 36
+        1, 7, 51, 55, 171, 81, 114, 180, 230, 211, 210, 17, 179, 247, 288, 308, 36, 323
     ]
 
     const conf: ConfigStruct = {
