@@ -86,7 +86,7 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
         line.currentPrice = uint96(msg.value);
         line.currentWinner = msg.sender;
 
-        emit Bid(nftId);
+        emit Bid(nftId, msg.sender, msg.value);
         
         uint40 extendedTime = uint40(block.timestamp + _auctionConfig.timeBuffer);
         if (extendedTime > line.endTime)
@@ -104,6 +104,7 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
     }
 
     function _settleAuction(LineState memory line) private {
+        emit Won(line.head, line.currentWinner, line.currentPrice);
         address nftContract = _auctionConfig.auctionedNft;
         IExternallyMintable(nftContract).mint(line.head, line.currentWinner);
         payable(nftContract).transfer(line.currentPrice);

@@ -35,8 +35,14 @@ describe('FigmataAuction', async () => {
     })
     
     it('should be able to configure vips', async () => {
-        const { auction, pixelady, deployer } = await figmataIntegrationDeployment({})
-        expect(await auction.tokenRequiredToOwnToBeVip()).equal(pixelady.address)
+        const { 
+            auction, deployer,
+            pixelady, pixeladyBc, milady, remilio
+        } = await figmataIntegrationDeployment({})
+        expect(await auction.tokensRequiredToOwnToBeVip(0)).equal(pixelady.address)
+        expect(await auction.tokensRequiredToOwnToBeVip(1)).equal(pixeladyBc.address)
+        expect(await auction.tokensRequiredToOwnToBeVip(2)).equal(milady.address)
+        expect(await auction.tokensRequiredToOwnToBeVip(3)).equal(remilio.address)
 
         const hacker = await getRandomFundedAccount()
 

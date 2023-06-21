@@ -29,7 +29,7 @@ export const figmataIntegrationDeployment = async ({
         maxSupply,
         platformFee: 500,
         ownerAltPayout,
-        superAffiliatePayout
+        altPlatformPayout: superAffiliatePayout
     }
 
     const figmata = await FigmataFactory.connect(deployer).deploy(

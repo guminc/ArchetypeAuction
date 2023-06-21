@@ -459,7 +459,7 @@ describe('FigmataIntegration', async () => {
 
     }).timeout(200_000)
 
-    it.only('should allow vip bidding', async () => {
+    it('should allow vip bidding', async () => {
 
         const { 
             auction, user, figmata, deployer,

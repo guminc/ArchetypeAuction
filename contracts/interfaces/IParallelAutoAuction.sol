@@ -7,7 +7,8 @@ import "./IHoldsParallelAutoAuctionData.sol";
 
 interface IParallelAutoAuction is IEthAuction, IHoldsParallelAutoAuctionData {
     
-    event Bid(uint24 tokenId);
+    event Bid(uint24 indexed tokenId, address bidder, uint256 value);
+    event Won(uint24 indexed tokenId, address bidder, uint256 value);
 
     /**
      * @dev This method lets a `nftId` winner to claim it after an aunction ends,
