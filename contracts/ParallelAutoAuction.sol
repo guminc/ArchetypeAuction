@@ -1,4 +1,17 @@
 // SPDX-License-Identifier: MIT
+// Archetype ParallelAutoAuction
+//
+//        d8888                 888               888
+//       d88888                 888               888
+//      d88P888                 888               888
+//     d88P 888 888d888 .d8888b 88888b.   .d88b.  888888 888  888 88888b.   .d88b.
+//    d88P  888 888P"  d88P"    888 "88b d8P  Y8b 888    888  888 888 "88b d8P  Y8b
+//   d88P   888 888    888      888  888 88888888 888    888  888 888  888 88888888
+//  d8888888888 888    Y88b.    888  888 Y8b.     Y88b.  Y88b 888 888 d88P Y8b.
+// d88P     888 888     "Y8888P 888  888  "Y8888   "Y888  "Y88888 88888P"   "Y8888
+//                                                            888 888
+//                                                       Y8b d88P 888
+//                                                        "Y88P"  888
 
 pragma solidity ^0.8.4;
 
@@ -6,6 +19,7 @@ import "./interfaces/IParallelAutoAuction.sol";
 import "./interfaces/IExternallyMintable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "solady/src/utils/SafeTransferLib.sol";
+
 
 error WrongTokenId();
 error WrongBidAmount();
@@ -18,7 +32,9 @@ struct StateLocks {
     bool timeBufferLocked;
     bool startingPriceLocked;
     bool bidIncrementLocked;
+    bool panicRugLocked;
 }
+
 
 contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
     
@@ -51,6 +67,9 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
         _auctionConfig.bidIncrement = bidIncrement;
     }
 
+    /* ------------- *\
+    |* Bidding logic *|
+    \* ------------- */
     /**
      * @dev Create a bid for a NFT, with a given amount.
      * This contract only accepts payment in ETH.
@@ -133,8 +152,9 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
         }
     }
 
-
-    /* -- IAuctionInfo realizations -- */
+    /* --------------------------- *\
+    |* IAuctionInfo implementation *|
+    \* --------------------------- */
     function getIdsToAuction() external view returns (uint24[] memory) {
         uint24[] memory ids = new uint24[](_auctionConfig.lines);
         for (uint8 i = 0; i < _auctionConfig.lines; i++) {
@@ -160,7 +180,9 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
     }
     
 
-    /* -- IHoldsParallelAutoAuctionData realizations --*/
+    /* -------------------------------------------- *\
+    |* IHoldsParallelAutoAuctionData implementation *|
+    \* -------------------------------------------- */
     function auctionConfig() external view returns (AuctionConfig memory) {
         return _auctionConfig;    
     }
@@ -197,7 +219,9 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
     }
 
 
-    /* -- General contract state reconfiguration --*/
+    /* ----------------------------------- *\
+    |* General contract state manipulation *|
+    \* ----------------------------------- */
     /**
      * @dev Updating `baseDuration` will only affect to future auctions.
      */
@@ -229,9 +253,21 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
         if (_stateLocks.bidIncrementLocked) revert OptionLocked();
         _auctionConfig.bidIncrement = bidIncrement;
     }
+    
+    /**
+     * @dev This method lets the auction owner draining the contract and 
+     * forcing the system to halt.
+     */
+    function panicRug() external onlyOwner {
+        if(_stateLocks.panicRugLocked) revert OptionLocked();
+        _auctionConfig.auctionedNft = address(0);
+        SafeTransferLib.forceSafeTransferETH(owner(), address(this).balance);
+    }
 
 
-    /* -- General contract state locks -- */
+    /* ---------------- *\
+    |* Contract locking *|
+    \* ---------------- */
     function lockBaseDurationForever() external onlyOwner {
         _stateLocks.baseDurationLocked = true;
     }

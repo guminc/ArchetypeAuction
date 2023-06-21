@@ -89,8 +89,8 @@ const productionDeployment = async () => {
     }
     
     const figmata = await FigmataFactory.connect(deployer).deploy(
-        'Pixelady Figmata', // TODO
-        'PXLDYFG',
+        'Pixelady Figmata',
+        'PXLDYFGMTA',
         conf
     )
 
