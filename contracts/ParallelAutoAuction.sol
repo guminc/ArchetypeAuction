@@ -124,7 +124,7 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
         line.startTime = uint40(block.timestamp);
         line.endTime = uint40(block.timestamp + _auctionConfig.baseDuration);
 
-        if (line.head == 0) line.head += lineNumber; 
+        if (line.head == 0) line.head = lineNumber; 
         else {
             line.head += _auctionConfig.lines;
             line.currentPrice = 0;

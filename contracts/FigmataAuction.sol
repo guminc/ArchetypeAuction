@@ -7,11 +7,11 @@ import "./interfaces/ISharesHolder.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 
-error OwnershipError(address ofToken);
+error NotVip();
 
 struct Options {
     bool sharesUpdaterUpdatingLocked;
-    bool vipRequiredTokenLocked;
+    bool vipRequiredTokensLocked;
     bool vipIdsLocked;
 }
 
@@ -22,15 +22,14 @@ contract FigmataAuction is ParallelAutoAuction, ISharesHolder {
 	mapping(address => bool) private _allowSharesUpdate;
     mapping(uint24 => bool) private _tokenIdIsVip;
 
-    address public tokenRequiredToOwnToBeVip;
+    address[] public tokensRequiredToOwnToBeVip;
 
     Options public options;
 
     function createBid(uint24 nftId) override public payable {
-        if (
-            _tokenIdIsVip[nftId] &&
-            IERC721(tokenRequiredToOwnToBeVip).balanceOf(msg.sender) < 1
-        ) revert OwnershipError(tokenRequiredToOwnToBeVip);
+
+        if (_tokenIdIsVip[nftId] && !userIsVip(msg.sender))
+            revert NotVip();
 
 		super.createBid(nftId);
 		_rewardTokenShares[msg.sender] += msg.value;
@@ -48,10 +47,20 @@ contract FigmataAuction is ParallelAutoAuction, ISharesHolder {
         return _tokenIdIsVip[id];
     }
 
-    function setTokenRequiredToHoldToBeVip(address token) external onlyOwner {
-        if (options.vipRequiredTokenLocked) revert OptionLocked(); 
-        tokenRequiredToOwnToBeVip = token;
+    function setTokensRequiredToHoldToBeVip(address[] memory tokens) external onlyOwner {
+        if (options.vipRequiredTokensLocked) revert OptionLocked(); 
+        tokensRequiredToOwnToBeVip = tokens;
     }
+
+    /**
+     * @return itIs Only if `user` holds at least one `tokensRequiredToOwnToBeVip`.
+     */
+    function userIsVip(address user) public view returns (bool itIs) {
+        for (uint256 i = 0; i < tokensRequiredToOwnToBeVip.length; i++)
+            if (IERC721(tokensRequiredToOwnToBeVip[i]).balanceOf(user) > 0)
+                return true;
+    }
+
 
     /* ---------------------------- *\
     |* ISharesHolder implementation *|
@@ -87,8 +96,8 @@ contract FigmataAuction is ParallelAutoAuction, ISharesHolder {
         options.sharesUpdaterUpdatingLocked = true;
     }
     
-    function lockTokenRequiredToHoldToBeVipForever() external onlyOwner {
-        options.vipRequiredTokenLocked = true;
+    function lockTokensRequiredToHoldToBeVipForever() external onlyOwner {
+        options.vipRequiredTokensLocked = true;
     }
 
     function lockVipIdsForever() external onlyOwner {

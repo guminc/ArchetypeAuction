@@ -20,6 +20,9 @@ export const figmataIntegrationDeployment = async ({
     const [ deployer, ]= await ethers.getSigners()
 
     const pixelady = await PixeladyFactory.deploy()
+    const pixeladyBc = await PixeladyFactory.deploy()
+    const milady = await PixeladyFactory.deploy()
+    const remilio = await PixeladyFactory.deploy()
 
     const conf: ConfigStruct = {
         baseUri: 'ipfs://fakeUri',
@@ -46,12 +49,15 @@ export const figmataIntegrationDeployment = async ({
         toWei(bidIncrement)
     )
 
-    await auction.connect(deployer).setTokenRequiredToHoldToBeVip(pixelady.address)
+    await auction.connect(deployer).setTokensRequiredToHoldToBeVip([
+        pixelady.address, pixeladyBc.address, milady.address, remilio.address
+    ])
     await figmata.connect(deployer).addMinter(auction.address)
     
     const user = await getRandomFundedAccount()
 
     return {
-        deployer, pixelady, auction, figmata, user
+        deployer, auction, figmata, user,
+        pixelady, pixeladyBc, milady, remilio
     }
 }

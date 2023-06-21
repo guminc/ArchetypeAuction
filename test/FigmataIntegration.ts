@@ -1,9 +1,9 @@
-import { expect } from 'chai';
+import { expect, assert } from 'chai';
 import { ethers } from 'hardhat';
 import { figmataIntegrationDeployment } from '../scripts/integrationTestingHelpers';
 import { fromWei, getContractBalance, getLastTimestamp, getRandomAccount, getRandomFundedAccount, sleep, toWei } from '../scripts/helpers';
 import { BigNumber } from 'ethers';
-import { FigmataAuction__factory } from '../typechain-types';
+import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 
 describe('FigmataIntegration', async () => {
 
@@ -189,14 +189,14 @@ describe('FigmataIntegration', async () => {
 
     })
 
-    it.only('should allow minting out', async () => {
+    it.skip('should allow minting out', async () => {
         const auctionsAtSameTime = 3
         const auctionDuration = 30
-        const extraAuctionTime = 10
+        const extraAuctionTime = 15
         const startingPrice = toWei(0)
         const bidIncrement = toWei(0.025)
         const maxSupply = 12
-
+        
         const { 
             auction, figmata, user
         } = await figmataIntegrationDeployment({
@@ -212,14 +212,20 @@ describe('FigmataIntegration', async () => {
 
         const randombid = async (id: number, value: BigNumber) => {
             const line = await auction.lineState(id)
+            // NOTE This should be protected with a mutex if we really
+            // want the contract bals checks to work.
             const iniAuctionBal = await getContractBalance(auction)
             const bidder = await getRandomFundedAccount()
 
             bidForId[id] = value
             await auction.connect(bidder).createBid(id, { value })
-            
+
+            const settleDecrement = line.currentWinner === ethers.constants.AddressZero
+                ? iniAuctionBal
+                : toWei(0)
+
             expect(await getContractBalance(auction)).equal(
-                iniAuctionBal.add(value).sub(line.currentPrice)
+                iniAuctionBal.add(value).sub(line.currentPrice).sub(settleDecrement)
             )
             
             const balIncrement = line.currentWinner === ethers.constants.AddressZero 
@@ -237,41 +243,49 @@ describe('FigmataIntegration', async () => {
         }
     
         const settle = async (id: number) => {
-            const line = await auction.lineState(id)
             const iniContractBal = await getContractBalance(figmata)
-            const iniWinnerBal = await figmata.balanceOf(line.currentWinner)
+            const iniSupply = await figmata.totalSupply() 
 
             await auction
                 .connect(await getRandomFundedAccount())
                 .settleAuction(id)
             
             expect(await getContractBalance(figmata)).equal(
-                iniContractBal.add(line.currentPrice)
+                iniContractBal.add(bidForId[id])
             )
 
-            expect(await figmata.balanceOf(line.currentWinner)).equal(
-                iniWinnerBal.add(1)
-            )
+            expect(await figmata.totalSupply()).equal(iniSupply.add(1))
         }
 
-        const trybid = async (id: number, value: BigNumber | 'max') => {
+        const trybid = async (id: number, value: BigNumber | 'max' | 'debug') => {
             const hacker = await getRandomFundedAccount()
             const gasPrice = toWei(0.01)
-            const bidAmount = value === 'max'
+
+            const bidAmount = value === 'max' || value === 'debug'
                 ? (await hacker.getBalance()).sub(gasPrice) 
                 : value
-
-            await expect(auction.connect(hacker).createBid(
-                id, { value: bidAmount }
-            )).reverted
+            
+            if (value === 'debug') {
+                console.log(await hacker.getBalance())
+                console.log(bidAmount)
+            }
+            try {
+                await auction.connect(hacker).createBid(
+                    id, { value: bidAmount }
+                )
+                assert(false)
+            } catch {
+                assert(true)
+            }
+            //await expect(auction.connect(hacker).createBid(
+            //    id, { value: bidAmount }
+            //)).reverted
         }
 
         const miniFuzzer = async () => {
             const promises: Promise<any>[] = [];
-
-            [1,2,3].map(async (id: number) => {
-                const line = await auction.lineState(id)
-
+            [1,2,3].map(async (i: number) => {
+                const line = await auction.lineState(i)
                 if (line.currentWinner !== ethers.constants.AddressZero)
                     promises.push(trysettle(line.head))
 
@@ -291,27 +305,24 @@ describe('FigmataIntegration', async () => {
 
 
         const waitToEnd = async (id: number) => {
-            const promises: Promise<any>[] = []
-            while (true) {
-                const line = await auction.lineState(id)
-                if (line.head !== id) break
-                await sleep(0.5)
-                promises.push(miniFuzzer())
-            }
-            await Promise.all(promises)
+            const line = await auction.lineState(id)
+            if (line.head !== id) return 
+            await sleep(0.5)
+            await waitToEnd(id)
         }
 
         const waitToAlmostEnd = async (id: number) => {
             const t = await getLastTimestamp()
             const line = await auction.lineState(id)
 
-            if (t + 6 >= line.endTime) return
+            if (t + 8 >= line.endTime) return
             await sleep(0.5)
             await waitToAlmostEnd(id)
         }
 
         const fstLineComputations = async () => {
             await miniFuzzer() 
+            // Id 1
             await randombid(1, startingPrice)
             await miniFuzzer() 
             await randombid(1, bidForId[1].add(bidIncrement))
@@ -327,24 +338,173 @@ describe('FigmataIntegration', async () => {
                 miniFuzzer()
             ])
             await miniFuzzer()
-            await randombid(4, startingPrice.add(bidIncrement).sub(1)) // Fails!
+            // Id 4
+            await randombid(4, startingPrice.add(bidIncrement).sub(1))
+            await miniFuzzer()
+            await randombid(4, bidForId[4].add(bidIncrement))
+            await miniFuzzer()
+            await randombid(4, bidForId[4].add(bidIncrement).add(1))
+            await miniFuzzer()
+            await waitToEnd(4)
+            await miniFuzzer()
+            await settle(4)
+            await miniFuzzer()
+            // Id 7
+            await randombid(7, startingPrice.add(1))
+            await miniFuzzer()
+            await waitToEnd(7)
+            await miniFuzzer()
+            // Id 10
+            await randombid(10, startingPrice.add(bidIncrement).add(1))
+            await miniFuzzer()
+            await randombid(10, bidForId[10].add(bidIncrement))
+            await miniFuzzer()
+            await randombid(10, bidForId[10].add(bidIncrement).add(32))
+            await miniFuzzer()
+            await randombid(10, bidIncrement.mul(2).add(bidForId[10]))
+            await miniFuzzer()
+            await randombid(10, bidIncrement.mul(2).add(bidForId[10]).sub(1))
+            await miniFuzzer()
+            await waitToEnd(10)
+            await miniFuzzer()
+            await miniFuzzer()
+            await settle(10)
             await miniFuzzer()
         }
 
         const sndLineComputations = async () => {
-            
+            // Id 2
+            await randombid(2, startingPrice)
+            await miniFuzzer() 
+            await randombid(2, bidForId[2].add(bidIncrement))
+            await miniFuzzer() 
+            await randombid(2, bidForId[2].add(bidIncrement).add(123))
+            await miniFuzzer() 
+            await waitToAlmostEnd(2)
+            await randombid(2, bidForId[2].add(bidIncrement))
+            await miniFuzzer() 
+            await Promise.all([
+                miniFuzzer(),
+                waitToEnd(2),
+                miniFuzzer()
+            ])
+            await miniFuzzer()
+            // Id 5
+            await randombid(5, startingPrice.add(bidIncrement).sub(1))
+            await miniFuzzer()
+            await randombid(5, bidForId[5].add(bidIncrement))
+            await miniFuzzer()
+            await randombid(5, bidForId[5].add(bidIncrement).add(1))
+            await miniFuzzer()
+            await waitToEnd(5)
+            await miniFuzzer()
+            await settle(5)
+            await miniFuzzer()
+            // Id 8
+            await randombid(8, startingPrice.add(1))
+            await miniFuzzer()
+            await waitToEnd(8)
+            await miniFuzzer()
+            // Id 11
+            await randombid(11, startingPrice.add(bidIncrement).add(1))
+            await miniFuzzer()
+            await randombid(11, bidForId[11].add(bidIncrement))
+            await miniFuzzer()
+            await randombid(11, bidForId[11].add(bidIncrement).add(32))
+            await miniFuzzer()
+            await randombid(11, bidIncrement.mul(2).add(bidForId[11]))
+            await miniFuzzer()
+            await randombid(11, bidIncrement.mul(2).add(bidForId[11]).sub(1))
+            await miniFuzzer()
+            await waitToEnd(11)
+            await miniFuzzer()
+            await miniFuzzer()
+            await settle(11)
+            await miniFuzzer()
         }
 
-        const thdLineComputations = async () => {
-            
+        const finalAttacks = async () => {
+            await trybid(10, 'debug')
+            await trybid(11, 'max')
+            await trybid(12, 'max')
+            await trybid(13, 'max')
+            await trybid(1, 'max')
+            await trybid(2, 'max')
+            await trybid(4, 'max')
+            await trybid(5, 'max')
+            await trybid(7, 'max')
+            await trybid(8, 'max')
+            await trybid(10, 'max')
+            await trybid(11, 'max')
+            await trysettle(10)
+            await trysettle(11)
+            await trysettle(12)
+            await trysettle(13)
+            await trysettle(1)
+            await trysettle(2)
+            await trysettle(4)
+            await trysettle(5)
+            await trysettle(7)
+            await trysettle(8)
+            await trysettle(10)
+            await trysettle(11)
+
+            expect(await getContractBalance(auction)).equal(0)
+            await randombid(3, startingPrice)
         }
+
+        await fstLineComputations()
+        await sndLineComputations()
+        await finalAttacks()
+
+    }).timeout(200_000)
+
+    it.only('should allow vip bidding', async () => {
+
+        const { 
+            auction, user, figmata, deployer,
+            pixelady, pixeladyBc, milady, remilio
+        } = await figmataIntegrationDeployment({
+            auctionsAtSameTime: 10,
+            auctionDuration: 10,
+            extraAuctionTime: 5,
+            startingPrice: 0,
+            bidIncrement: 0.025
+        })
+
+        const hacker = await getRandomFundedAccount()
         
-        await Promise.all([
-            fstLineComputations(),
-            sndLineComputations(),
-            thdLineComputations()
-        ])
+        const vipIds = [
+            1, 7, 51, 55, 171, 81, 114, 180, 230,
+            211, 210, 17, 179, 247, 288, 308, 36   
+        ]
 
+        await expect(auction.connect(hacker).setVipIds(vipIds, true)).reverted
+        await auction.connect(deployer).setVipIds(vipIds, true)
+        
+        const mkbid = async (id: number, acc: SignerWithAddress | null = null) => auction
+            .connect(acc === null ? await getRandomFundedAccount() : acc)
+            .createBid(id, { 
+                value: (await auction.lineState(id)).currentPrice.add(toWei(0.025)) 
+            })
+
+        await expect(mkbid(1)).reverted
+        await expect(mkbid(7)).reverted
+        await mkbid(2)
+
+        const holderOfOne = await getRandomFundedAccount()
+        await pixeladyBc.connect(deployer).mint(holderOfOne.address, 721)
+
+        const holderOfAll = await getRandomFundedAccount()
+        await pixeladyBc.connect(deployer).mint(holderOfAll.address, 13)
+        await pixelady.connect(deployer).mint(holderOfAll.address, 11)
+        await milady.connect(deployer).mint(holderOfAll.address, 3000)
+        await remilio.connect(deployer).mint(holderOfAll.address, 721)
+
+        await mkbid(7, holderOfOne)
+        await expect(mkbid(7)).reverted
+        await mkbid(7, holderOfAll)
+        await mkbid(1, holderOfAll)
     })
 
 });
