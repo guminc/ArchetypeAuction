@@ -113,7 +113,7 @@ contract FuzzyParallelAutoAuction is IParallelAutoAuction, Ownable {
 
     }
 
-    function settleAuction(uint24 nftId) external {
+    function settleAuction(uint24 nftId) public {
         LineState memory line = _lineToState[tokenIdToLineNumber(nftId)];
         IExternallyMintable token = IExternallyMintable(_auctionConfig.auctionedNft);
         require(block.timestamp > line.endTime, "Auction still ongoing.");
