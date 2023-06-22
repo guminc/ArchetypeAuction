@@ -32,7 +32,6 @@ struct StateLocks {
     bool timeBufferLocked;
     bool startingPriceLocked;
     bool bidIncrementLocked;
-    bool panicRugLocked;
 }
 
 

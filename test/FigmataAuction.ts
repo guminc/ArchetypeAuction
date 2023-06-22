@@ -3,7 +3,6 @@ import {
     getContractBalance,
     getRandomFundedAccount,
     mkMinBid,
-    parallelAutoAuction,
     range,
     sleep,
     toWei 

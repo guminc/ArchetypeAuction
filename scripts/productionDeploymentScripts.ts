@@ -82,7 +82,7 @@ const productionDeployment = async () => {
     const miladyAddress = '0x5Af0D9827E0c53E4799BB226655A1de152A425a5'
     const remilioAddress = '0xD3D9ddd0CF0A5F0BFB8f7fcEAe075DF687eAEBaB'
 
-    const baseUri = 'bafybeia4sm7z4kz2zolti6byrgktpkuotxmpots2httddn5i4ffm6ucdba/'
+    const baseUri = 'ipfs://bafybeia4sm7z4kz2zolti6byrgktpkuotxmpots2httddn5i4ffm6ucdba/'
     const maxSupply = 360
     const altPayoutPipeline = '0x6a6d59af77e75c5801bad3320729b81e888b5f09'
     const vipIds = [ 
@@ -97,12 +97,14 @@ const productionDeployment = async () => {
         altPlatformPayout: ethers.constants.AddressZero,
     }
     
+    console.log('Deploying Figmata...')
     const figmata = await FigmataFactory.connect(deployer).deploy(
         'Pixelady Figmata',
         'PXLDYFGMTA',
         conf
     )
 
+    console.log('Deploying Auction...')
     const auction = await FigmataAuctionFactory.connect(deployer).deploy()
     const auctionsAtSameTime = 10
     const auctionDuration = 24 * 60 * 60 // 1 day.
@@ -110,6 +112,7 @@ const productionDeployment = async () => {
     const startingPrice = toWei(0)
     const bidIncrement = toWei(0.025)
     
+    console.log('Initializing Auction...')
     await auction.connect(deployer).initialize(
         figmata.address,
         auctionsAtSameTime,
@@ -119,10 +122,12 @@ const productionDeployment = async () => {
         bidIncrement
     )
 
+    console.log('Setting Vip collections...')
     await auction.connect(deployer).setTokensRequiredToHoldToBeVip([
         pixeladyAddress, pixeladyBcAddress, miladyAddress, remilioAddress
     ])
 
+    console.log('Setting Vip Ids...')
     await auction.connect(deployer).setVipIds(vipIds, true)
     
     console.log(`Pixelady Figmata address: ${figmata.address}`)
@@ -135,7 +140,7 @@ const productionDeployment = async () => {
 }
 
 
-const production = false
+const production = true
 
 const deploymentFunction = production 
     ? productionDeployment
@@ -146,7 +151,6 @@ const msg = production
     : 'Deploying into pre-production...'
 
 console.log(msg)
-
 deploymentFunction()
     .then(() => console.log('Successful deployment :D'))
     .catch(e => console.log(`Something went wrong! ${e}`))
