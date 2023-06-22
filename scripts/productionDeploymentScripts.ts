@@ -20,9 +20,13 @@ const preProdTestnetDeployment = async () => {
     await milady.connect(deployer).mint(
         '0xDFA0B3fCf7B9E6e1BFB8ef536Aa33B5aF6Fd7F47', 13
     )
+        
+    // Pixelady URI for testing.
+    const baseUri = 'ipfs://bafybeigd7557iwardhnwg5kbmg2s7tmuxqkstjeoixu7wunooiywbb3jqq/'
+    // Who the fuck cares? The test uri should be for the tokens above! I guess?
 
     const conf: ConfigStruct = {
-        baseUri: 'ipfs://fakeUri',
+        baseUri,
         maxSupply: 360,
         platformFee: 500,
         ownerAltPayout: '0x6a6d59af77e75c5801bad3320729b81e888b5f09',
@@ -56,6 +60,11 @@ const preProdTestnetDeployment = async () => {
     ])
 
     await figmata.connect(deployer).addMinter(auction.address)
+
+    const vipIds = [ 
+        1, 7, 51, 55, 171, 81, 114, 180, 230, 211, 210, 17, 179, 247, 288, 308, 36, 323
+    ]
+    await auction.connect(deployer).setVipIds(vipIds, true)
     
     console.log(`Pixelady Figmata address: ${figmata.address}`)
     console.log(`Auction address address: ${auction.address}`)
@@ -73,11 +82,11 @@ const productionDeployment = async () => {
     const miladyAddress = '0x5Af0D9827E0c53E4799BB226655A1de152A425a5'
     const remilioAddress = '0xD3D9ddd0CF0A5F0BFB8f7fcEAe075DF687eAEBaB'
 
-    const baseUri = 'ipfs://fakeUri' // TODO TODO TODO
+    const baseUri = 'bafybeia4sm7z4kz2zolti6byrgktpkuotxmpots2httddn5i4ffm6ucdba/'
     const maxSupply = 360
     const altPayoutPipeline = '0x6a6d59af77e75c5801bad3320729b81e888b5f09'
     const vipIds = [ 
-        1, 7, 51, 55, 171, 81, 114, 180, 230, 211, 210, 17, 179, 247, 288, 308, 36, 323
+        1, 7, 51, 55, 171, 81, 114, 180, 230, 211, 210, 17, 179, 247, 288, 308, 36, 323, 8
     ]
 
     const conf: ConfigStruct = {
@@ -127,9 +136,16 @@ const productionDeployment = async () => {
 
 
 const production = false
+
 const deploymentFunction = production 
     ? productionDeployment
     : preProdTestnetDeployment
+
+const msg = production
+    ? 'Deploying into production...'
+    : 'Deploying into pre-production...'
+
+console.log(msg)
 
 deploymentFunction()
     .then(() => console.log('Successful deployment :D'))

@@ -460,7 +460,6 @@ describe('FigmataIntegration', async () => {
     }).timeout(200_000)
 
     it('should allow vip bidding', async () => {
-
         const { 
             auction, user, figmata, deployer,
             pixelady, pixeladyBc, milady, remilio
@@ -505,6 +504,9 @@ describe('FigmataIntegration', async () => {
         await expect(mkbid(7)).reverted
         await mkbid(7, holderOfAll)
         await mkbid(1, holderOfAll)
+        expect(await auction.connect(holderOfOne).userIsVip(holderOfOne.address)).true
+        expect(await auction.connect(holderOfAll).userIsVip(holderOfOne.address)).true
+        expect(await auction.connect(hacker).userIsVip(hacker.address)).false
     })
 
 });

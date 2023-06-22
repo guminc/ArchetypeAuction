@@ -34,7 +34,7 @@ struct Config {
     string baseUri;
     // optional alternative address for owner withdrawals.
     address ownerAltPayout; 
-    // optional super affiliate address, will receive half of platform fee if set.
+    // optional platform address, will receive half of platform fee if set.
     address altPlatformPayout; 
     uint24 maxSupply;
     uint16 platformFee; //BPS
@@ -48,7 +48,7 @@ struct Options {
     bool ownerAltPayoutLocked;
 }
 
-address constant PLATFORM = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC;
+address constant PLATFORM = 0x86B82972282Dd22348374bC63fd21620F7ED847B;
 uint16 constant MAXBPS = 5000; // max fee or discount is 50%
 
 
@@ -80,16 +80,12 @@ contract PixeladyFigmata is ERC721Enumerable, Ownable, IExternallyMintable {
         if (config.altPlatformPayout != address(0)) {
             payable(PLATFORM).transfer(platformFee / 2);
             payable(config.altPlatformPayout).transfer(platformFee / 2);
-        } else {
-            payable(PLATFORM).transfer(platformFee);
-        }
+        } else payable(PLATFORM).transfer(platformFee);
         
         // Collection owner withdrawal
-        if (config.ownerAltPayout != address(0)) {
+        if (config.ownerAltPayout != address(0))
             payable(config.ownerAltPayout).transfer(address(this).balance);
-        } else {
-            payable(owner()).transfer(address(this).balance);
-        }
+        else payable(owner()).transfer(address(this).balance);
     }
 
     function getPlatform() external pure returns (address) {
