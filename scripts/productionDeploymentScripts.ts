@@ -1,6 +1,7 @@
 import { ethers } from "hardhat"
 import { ConfigStruct } from "../typechain-types/contracts/tokens/PixeladyFigmata"
 import { toWei } from "./helpers"
+import { FigmataAuction__factory } from "../typechain-types"
 
 const preProdTestnetDeployment = async () => {
 
@@ -139,8 +140,34 @@ const productionDeployment = async () => {
     // await figmata.connect(deployer).addMinter(auction.address)
 }
 
+const launch = async () => {
+    const FigmataFactory = await ethers.getContractFactory('PixeladyFigmata')
+    const figmata = FigmataFactory.attach(
+        '0xE61443f7db3Ca8B7FC083602dcc52726db3d5Ff6'
+    )
+    const [ deployer, ] = await ethers.getSigners()
+    await figmata.connect(deployer).addMinter('0xd8DB2B119E0c1aDdb7969Ea2031963e373ebfFdE')
+    console.log('done!!!')
+}
 
-const production = true
+const fixForGodSake = async () => {
+    const FigmataFactory = await ethers.getContractFactory('PixeladyFigmata')
+    const AuctionFactory = await ethers.getContractFactory('FigmataAuction')
+    const figmata = FigmataFactory.attach(
+        '0x90C9367EC72acF58fe6B6387F676292d3365e963'
+    )
+
+    const auction = AuctionFactory.attach(
+        '0x5a5e12f15505F3836f68e47B1c858548C5077335'
+    )
+
+    const [ deployer, ] = await ethers.getSigners()
+
+    figmata.connect(deployer)
+      
+}
+
+/*const production = true
 
 const deploymentFunction = production 
     ? productionDeployment
@@ -154,4 +181,6 @@ console.log(msg)
 deploymentFunction()
     .then(() => console.log('Successful deployment :D'))
     .catch(e => console.log(`Something went wrong! ${e}`))
+*/
 
+launch().then(() => console.log('hi')).catch(e => console.log(e))

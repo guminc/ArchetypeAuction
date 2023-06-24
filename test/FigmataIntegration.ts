@@ -7,7 +7,7 @@ import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 
 describe('FigmataIntegration', async () => {
 
-    it('should allow basic withdrawal', async () => {
+    it.only('should allow basic withdrawal', async () => {
         const auctionDuration = 1
         const startingPrice = 0.01
         const { auction, user, figmata, deployer } = await figmataIntegrationDeployment({
@@ -38,7 +38,7 @@ describe('FigmataIntegration', async () => {
         )
     })
 
-    it('should allow complex moneypipe', async () => {
+    it.only('should allow complex moneypipe', async () => {
         const auctionDuration = 1
         const startingPrice = 0.01
 
@@ -76,6 +76,7 @@ describe('FigmataIntegration', async () => {
 
         expect(await deployer.getBalance()).equal(deployerIniBal)
 
+        console.log(toWei(startingPrice).mul(95).div(100))
         expect(await altDeployer.getBalance()).equal(
             toWei(startingPrice).mul(95).div(100)
         )
