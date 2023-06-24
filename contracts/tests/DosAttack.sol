@@ -4,11 +4,11 @@ pragma solidity ^0.8.4;
 
 import "../ParallelAutoAuction.sol";
 
-contract Reentrancy {
+contract DosAttack {
     
     ParallelAutoAuction auction;
-    uint8 i;
     uint24 id;
+    uint256 public i;
 
     constructor(address _auction) {
         auction = ParallelAutoAuction(_auction);
@@ -20,15 +20,7 @@ contract Reentrancy {
     }
 
     receive() external payable { 
-        i++;
-        if (i < 10) return;
-        auction.createBid{value: auction.getMinPriceFor(i)}(id);
-    }
-
-    fallback() payable external {
-        i++;
-        if (i < 10) return;
-        auction.createBid{value: auction.getMinPriceFor(i)}(id);
+        while (i < 158) i++;
     }
     
 }
