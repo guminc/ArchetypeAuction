@@ -14,5 +14,8 @@
     "fp-ts": "^2.15.0",
     "hardhat-gas-reporter": "^1.0.9",
     "solady": "^0.0.90"
+  },
+  "scripts": {
+    "withdraw": "npx hardhat run scripts/withdraw.ts --network mainnet"
   }
 }
