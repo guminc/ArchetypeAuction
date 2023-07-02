@@ -18,7 +18,7 @@ interface IExternallyMintable is IERC721 {
     /**
      * @dev Sets a `minter` so it can use the `mint` method.
      */
-    function setMinter(address minter) external;
+    function addMinter(address minter) external;
 
     /**
      * @dev Disallow `minter` from using the `mint` method.

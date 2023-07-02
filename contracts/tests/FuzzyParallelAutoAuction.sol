@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// Archetype ParallelAutoAuction
+// Archetype ParallelAutoAuction but with public state for testing purposes
 //
 //        d8888                 888               888
 //       d88888                 888               888
@@ -15,8 +15,8 @@
 
 pragma solidity ^0.8.4;
 
-import "./interfaces/IParallelAutoAuction.sol";
-import "./interfaces/IExternallyMintable.sol";
+import "../interfaces/IParallelAutoAuction.sol";
+import "../interfaces/IExternallyMintable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "solady/src/utils/SafeTransferLib.sol";
 
@@ -32,18 +32,19 @@ struct StateLocks {
     bool timeBufferLocked;
     bool startingPriceLocked;
     bool bidIncrementLocked;
+    bool panicRugLocked;
 }
 
 
-contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
+contract FuzzyParallelAutoAuction is IParallelAutoAuction, Ownable {
     
     // @notice The config for the auction should be immutable.
-    AuctionConfig private _auctionConfig;
+    AuctionConfig public _auctionConfig;
     
-    StateLocks private _stateLocks;
+    StateLocks public _stateLocks;
 
     // @notice `_lineToState[i]` should only be mutable from the line `i`. 
-    mapping(uint8 => LineState) private _lineToState;
+    mapping(uint8 => LineState) public _lineToState;
 
     function initialize(
         address nftToAuction,
@@ -52,7 +53,7 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
         uint32 timeBuffer,
         uint96 startingPrice,
         uint96 bidIncrement
-    ) external onlyOwner {
+    ) public onlyOwner {
         require(!_stateLocks.initializationLocked); 
         _stateLocks.initializationLocked = true;
 
@@ -112,7 +113,7 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
 
     }
 
-    function settleAuction(uint24 nftId) external {
+    function settleAuction(uint24 nftId) public {
         LineState memory line = _lineToState[tokenIdToLineNumber(nftId)];
         IExternallyMintable token = IExternallyMintable(_auctionConfig.auctionedNft);
         require(block.timestamp > line.endTime, "Auction still ongoing.");
@@ -257,19 +258,19 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
     /* ---------------- *\
     |* Contract locking *|
     \* ---------------- */
-    function lockBaseDurationForever() external onlyOwner {
+    function lockBaseDurationForever() public onlyOwner {
         _stateLocks.baseDurationLocked = true;
     }
 
-    function lockTimeBufferForever() external onlyOwner {
+    function lockTimeBufferForever() public onlyOwner {
         _stateLocks.timeBufferLocked = true;
     }
 
-    function lockStartingPriceForever() external onlyOwner {
+    function lockStartingPriceForever() public onlyOwner {
         _stateLocks.startingPriceLocked = true;
     }
 
-    function lockBidIncrementForever() external onlyOwner {
+    function lockBidIncrementForever() public onlyOwner {
         _stateLocks.bidIncrementLocked = true;
     }
 }

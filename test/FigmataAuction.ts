@@ -1,10 +1,8 @@
 import { assert, expect } from 'chai';
 import { 
-    cartesian,
     getContractBalance,
     getRandomFundedAccount,
     mkMinBid,
-    parallelAutoAuction,
     range,
     sleep,
     toWei 
@@ -13,14 +11,15 @@ import * as A from 'fp-ts/Array'
 import * as N from 'fp-ts/number'
 import { ethers } from 'hardhat';
 import { LineStateStruct } from '../typechain-types/contracts/ParallelAutoAuction';
-import { BigNumber, ContractTransaction } from 'ethers';
+import { BigNumber } from 'ethers';
+import { figmataIntegrationDeployment } from '../scripts/integrationTestingHelpers';
 
-describe('ParallelAutoAuction', async () => {
+describe('FigmataAuction', async () => {
     it('should show right initial ids', async () => {
         const expectedIdsLen = 32
         const expectedIds = range(1, expectedIdsLen)
 
-        const { auction } = await parallelAutoAuction({
+        const { auction } = await figmataIntegrationDeployment({
             auctionsAtSameTime: expectedIdsLen
         })
             
@@ -30,17 +29,47 @@ describe('ParallelAutoAuction', async () => {
     })
     
     it('should be able to configure minter', async () => {
-        const { auction, nft } = await parallelAutoAuction({})
-        expect(await nft.isMinter(auction.address)).true
+        const { auction, figmata } = await figmataIntegrationDeployment({})
+        expect(await figmata.isMinter(auction.address)).true
     })
     
+    it('should be able to configure vips', async () => {
+        const { 
+            auction, deployer,
+            pixelady, pixeladyBc, milady, remilio
+        } = await figmataIntegrationDeployment({})
+        expect(await auction.tokensRequiredToOwnToBeVip(0)).equal(pixelady.address)
+        expect(await auction.tokensRequiredToOwnToBeVip(1)).equal(pixeladyBc.address)
+        expect(await auction.tokensRequiredToOwnToBeVip(2)).equal(milady.address)
+        expect(await auction.tokensRequiredToOwnToBeVip(3)).equal(remilio.address)
+
+        const hacker = await getRandomFundedAccount()
+
+        await expect(auction.connect(hacker).setVipIds([32, 48], true)).reverted
+        await expect(auction.connect(hacker).setVipIds([32, 48], false)).reverted
+
+        expect(await auction.isVipId(32)).equal(false)
+        expect(await auction.isVipId(48)).equal(false)
+
+        await auction.connect(deployer).setVipIds([32, 48], true)
+
+        expect(await auction.isVipId(32)).equal(true)
+        expect(await auction.isVipId(48)).equal(true)
+
+        await auction.connect(deployer).setVipIds([32, 48], false)
+
+        expect(await auction.isVipId(32)).equal(false)
+        expect(await auction.isVipId(48)).equal(false)
+
+    })
+
     it('shouln\'t allow bidding on old ids', async () => {
         const expectedIdsLen = 3
         const auctionDuration = 2
         const startingPrice = 0.1
         const bidIncrement = 0.05
 
-        const { auction } = await parallelAutoAuction({
+        const { auction } = await figmataIntegrationDeployment({
             auctionsAtSameTime: expectedIdsLen, 
             auctionDuration, 
             extraAuctionTime: 0,
@@ -60,7 +89,7 @@ describe('ParallelAutoAuction', async () => {
     it('should allow bidding on new ids', async () => {
         const expectedIdsLen = 3
 
-        const { auction } = await parallelAutoAuction({
+        const { auction } = await figmataIntegrationDeployment({
             auctionsAtSameTime: expectedIdsLen, 
             auctionDuration: 2, 
             extraAuctionTime: 0,
@@ -81,7 +110,7 @@ describe('ParallelAutoAuction', async () => {
         const ids = range(1, expectedIdsLen)
         const idToBid = 2
 
-        const { auction } = await parallelAutoAuction({
+        const { auction } = await figmataIntegrationDeployment({
             auctionsAtSameTime: expectedIdsLen, 
             auctionDuration: 2, 
             extraAuctionTime: 0,
@@ -106,7 +135,7 @@ describe('ParallelAutoAuction', async () => {
         const expectedIdsLen = 3
         const idToBid = 2
 
-        const { auction, nft, user } = await parallelAutoAuction({
+        const { auction, figmata, user } = await figmataIntegrationDeployment({
             auctionsAtSameTime: expectedIdsLen, 
             auctionDuration: 1, 
             extraAuctionTime: 0,
@@ -117,14 +146,14 @@ describe('ParallelAutoAuction', async () => {
         await sleep(1)
         await bid(idToBid + expectedIdsLen)()
 
-        expect(await nft.balanceOf(user.address)).to.equals(1)
+        expect(await figmata.balanceOf(user.address)).to.equals(1)
     })
     
     it('should allow refunds on outbids', async () => {
         const startingPrice = 0.1 
         const bidIncrement = 0.05
 
-        const { auction } = await parallelAutoAuction({
+        const { auction } = await figmataIntegrationDeployment({
             startingPrice, bidIncrement
         })
         
@@ -149,7 +178,7 @@ describe('ParallelAutoAuction', async () => {
         const expectedIdsLen = 3
         const idToBid = 2
 
-        const { auction, nft, user } = await parallelAutoAuction({
+        const { auction, figmata, user } = await figmataIntegrationDeployment({
             auctionsAtSameTime: expectedIdsLen, 
             auctionDuration: 1, 
             extraAuctionTime: 0,
@@ -162,11 +191,11 @@ describe('ParallelAutoAuction', async () => {
         await bid(idToBid + expectedIdsLen)()
 
         expect(await getContractBalance(auction)).to.equals(minPrice)
-        expect(await getContractBalance(nft)).to.equals(minPrice)
+        expect(await getContractBalance(figmata)).to.equals(minPrice)
     })
 
     it('shouldn\'t allow bid below min price', async () => {
-        const { auction, user } = await parallelAutoAuction({
+        const { auction, user } = await figmataIntegrationDeployment({
             auctionDuration: 1, 
             extraAuctionTime: 0,
             startingPrice: 0.1
@@ -184,7 +213,7 @@ describe('ParallelAutoAuction', async () => {
         const expectedIdsLen = 4
         const expectedIds = [1,2,7,4]
 
-        const { auction } = await parallelAutoAuction({
+        const { auction } = await figmataIntegrationDeployment({
             auctionsAtSameTime: expectedIdsLen, 
             auctionDuration: 2, 
             extraAuctionTime: 0,
@@ -209,7 +238,7 @@ describe('ParallelAutoAuction', async () => {
         const bidIncrement = 0.05
         const epsilon = 0.0196
 
-        const { auction, user } = await parallelAutoAuction({
+        const { auction, user } = await figmataIntegrationDeployment({
             startingPrice: iniPrice, bidIncrement
         })
 
@@ -229,7 +258,7 @@ describe('ParallelAutoAuction', async () => {
         const startingPrice = 0.1
         const bidIncrement = 0.05
         
-        const { auction } = await parallelAutoAuction({
+        const { auction } = await figmataIntegrationDeployment({
             startingPrice, bidIncrement
         })
 
@@ -255,7 +284,7 @@ describe('ParallelAutoAuction', async () => {
         const bidIncrement = 0.05
         const auctionsAtSameTime = 10
         
-        const { auction } = await parallelAutoAuction({
+        const { auction } = await figmataIntegrationDeployment({
             auctionsAtSameTime,
             auctionDuration: 10, 
             extraAuctionTime: 0,
@@ -289,7 +318,7 @@ describe('ParallelAutoAuction', async () => {
 
 
     it('reentrancy test', async () => {
-        const { auction } = await parallelAutoAuction({
+        const { auction } = await figmataIntegrationDeployment({
             auctionDuration: 10, 
             extraAuctionTime: 0,
             startingPrice: 1,
@@ -329,7 +358,7 @@ describe('ParallelAutoAuction', async () => {
         const startingPrice = 0.1
         const bidIncrement = 0.05
 
-        const { auction, nft } = await parallelAutoAuction({
+        const { auction, figmata } = await figmataIntegrationDeployment({
             auctionsAtSameTime: 10,
             auctionDuration, 
             extraAuctionTime: 0,
@@ -350,10 +379,10 @@ describe('ParallelAutoAuction', async () => {
             .createBid(2, { value: toWei(startingPrice*10) })
         ).reverted
 
-        expect(await nft.balanceOf(bidder.address)).equal(1)
-        expect(await nft.balanceOf(auction.address)).equal(0)
+        expect(await figmata.balanceOf(bidder.address)).equal(1)
+        expect(await figmata.balanceOf(auction.address)).equal(0)
         expect(await getContractBalance(auction)).equal(0)
-        expect(await getContractBalance(nft)).equal(toWei(startingPrice))
+        expect(await getContractBalance(figmata)).equal(toWei(startingPrice))
     
         const newBidAmount = toWei(startingPrice).add(123)
 
@@ -364,152 +393,84 @@ describe('ParallelAutoAuction', async () => {
 
         await auction.connect(bidder1).createBid(12, { value: newBidAmount })
 
-        expect(await nft.balanceOf(bidder.address)).equal(1)
-        expect(await nft.balanceOf(auction.address)).equal(0)
+        expect(await figmata.balanceOf(bidder.address)).equal(1)
+        expect(await figmata.balanceOf(auction.address)).equal(0)
         expect(await getContractBalance(auction)).equal(newBidAmount)
-        expect(await getContractBalance(nft)).equal(toWei(startingPrice))
+        expect(await getContractBalance(figmata)).equal(toWei(startingPrice))
     })
 
-    it('shouldn\'t allow zero bid increments', async () => {
-        const startingPrice = 0.01
-        const bidIncrement = 0
-
-        await expect(parallelAutoAuction({
-            auctionsAtSameTime: 1, startingPrice, bidIncrement
-        })).reverted
-    })
-
-    it('should allow bid incrementing on free bids', async () => {
+    it('shouldn\'t allow multiple settlement', async () => {
+        const auctionDuration = 1
         const startingPrice = 0
-        const bidIncrement = 0.01
+        const bidIncrement = 0.025
 
-        const { auction, nft, user } = await parallelAutoAuction({
-            auctionsAtSameTime: 1, startingPrice, bidIncrement,
-            extraAuctionTime: 5
+        const { auction, user } = await figmataIntegrationDeployment({
+            auctionsAtSameTime: 10,
+            auctionDuration, 
+            extraAuctionTime: 0,
+            startingPrice,
+            bidIncrement
         })
-        
-        const mkbid = (n: BigNumber) => auction.connect(user).createBid(1, { value: n })
 
-        await mkbid(toWei(0))
-        await expect(mkbid(toWei(0))).reverted
-
-        const rangedBids = async (n: BigNumber) => {
-            await expect(mkbid(n.sub(1))).reverted
-            await mkbid(n)
-            await expect(mkbid(n)).reverted
-            await expect(mkbid(n.add(1))).reverted
-        }
-
-        await rangedBids(toWei(bidIncrement))
-        await rangedBids(toWei(bidIncrement).mul(2))
-        await rangedBids(toWei(bidIncrement).mul(3))
+        await auction.connect(user).createBid(1, { value: 0 })
+        await sleep(auctionDuration)
+        await auction.settleAuction(1)
+        await expect(auction.settleAuction(1)).reverted
+        await expect(auction.settleAuction(721)).reverted
+        await expect(auction.settleAuction(11)).reverted
     })
+
+    it('shouldn\'t allow settling wrong ids', async () => {
+        const auctionDuration = 1
+        const startingPrice = 0
+        const bidIncrement = 0.025
+
+        const { auction, user } = await figmataIntegrationDeployment({
+            auctionsAtSameTime: 10,
+            auctionDuration, 
+            extraAuctionTime: 0,
+            startingPrice,
+            bidIncrement
+        })
+
+        await auction.connect(user).createBid(1, { value: 0 })
+
+        await expect(auction.settleAuction(1)).reverted
+        await sleep(auctionDuration)
+
+        await expect(auction.settleAuction(0)).reverted
+        await expect(auction.settleAuction(2)).reverted
+        await expect(auction.settleAuction(722)).reverted
+        
+        // Won't revert because `721 % auctionsAtSameTime == 721 % 10 == 1`!
+        await auction.settleAuction(721)
+    })
+
+    it('should allow bidding on high ids', async () => {
+        const { auction, user, figmata } = await figmataIntegrationDeployment({
+            auctionsAtSameTime: 255,
+            maxSupply: 765,
+            startingPrice: 0.01,
+            auctionDuration: 2
+        })
     
-    const rangedBidsBuilder = (
-        biddingFunction: (n: BigNumber) => Promise<ContractTransaction>
-    ) => async (n: BigNumber) => {
-        await expect(biddingFunction(n.sub(1))).reverted
-        await biddingFunction(n)
-        await expect(biddingFunction(n)).reverted
-        await expect(biddingFunction(n.add(1))).reverted
-    }
-
-    it('should allow bid incrementing normal bid', async () => {
-        const startingPrices = [0.01, 0.1, 0.005, 0.0005]
-        const bidIncrements = [0.0099, 0.005, 0.01001, 0.02, 0.0005]
-        
-        const prod = cartesian(startingPrices, bidIncrements)
-
-        for (const [startingPrice, bidIncrement] of prod) {
-            const { auction, user } = await parallelAutoAuction({
-                auctionsAtSameTime: 1, startingPrice, bidIncrement,
-                extraAuctionTime: 5
-            })
-            
-            const mkbid = (n: BigNumber) => auction.connect(user).createBid(1, { value: n })
-            const rangedBids = rangedBidsBuilder(mkbid) 
-
-            await expect(mkbid(toWei(0))).reverted
-            await expect(mkbid(toWei(startingPrice).sub(1))).reverted
-            await mkbid(toWei(startingPrice))
-
-            await rangedBids(toWei(startingPrice).add(toWei(bidIncrement)))
-            await rangedBids(toWei(bidIncrement).mul(2).add(toWei(startingPrice)))
-            await rangedBids(toWei(bidIncrement).mul(3).add(toWei(startingPrice)))
-
+        const auctionsBundle = async (n: number) => {
+            await auction.connect(user).createBid(n-254, { value: toWei(0.01) })
+            await auction.connect(user).createBid(n, { value: toWei(0.01) })
+            await expect(
+                auction.connect(user).createBid(n-255, { value: toWei(0.01).mul(10) })
+            ).reverted
+            await expect(
+                auction.connect(user).createBid(n+1, { value: toWei(0.01).mul(10) })
+            ).reverted
         }
 
-    })
-
-    it('should allow bid incrementing normal bid with fuzzing', async () => {
-        const startingPrices = [0.01, 0.1, 0.005, 0.0005]
-        const bidIncrements = [0.0099, 0.005, 0.01001, 0.02, 0.0005]
-        
-        const prod = cartesian(startingPrices, bidIncrements)
-
-        for (const [startingPrice, bidIncrement] of prod) {
-
-            const { auction, user } = await parallelAutoAuction({
-                auctionsAtSameTime: 1,
-                startingPrice,
-                bidIncrement,
-                auctionDuration: 100,
-                extraAuctionTime: 5
-            })
-
-            const hacker = await getRandomFundedAccount()
-            const iniHackerBal = await hacker.getBalance()
-            const iniBal = await user.getBalance()
-
-            const fuzzer = async () => { try {
-                const bid = auction.connect(hacker).createBid(
-                    1, { value: (await auction.getMinPriceFor(1)).sub(1) }
-                )
-                await bid
-                await auction.connect(hacker).settleAuction(0)
-                await bid
-                await auction.connect(hacker).settleAuction(1)
-                await bid
-                await auction.connect(hacker).settleAuction(2)
-                await bid
-            } catch {}}
-            
-            const mkbid = (n: BigNumber) => auction.connect(user).createBid(1, { value: n })
-            const rangedBids = rangedBidsBuilder(mkbid) 
-            
-            await expect(mkbid(toWei(0))).reverted
-            await expect(mkbid(toWei(startingPrice).sub(1))).reverted
-            await fuzzer()
-
-            await mkbid(toWei(startingPrice))
-            await fuzzer()
-
-            await rangedBids(toWei(startingPrice).add(toWei(bidIncrement)))
-            await fuzzer()
-            
-            await rangedBids(toWei(bidIncrement).mul(2).add(toWei(startingPrice)))
-            await fuzzer()
-
-            const lastBid = toWei(bidIncrement).mul(3).add(toWei(startingPrice))
-            await rangedBids(lastBid)
-            await fuzzer()
-
-            expect(await hacker.getBalance()).lessThan(iniHackerBal)
-            const line = await auction.lineState(1)
-            expect(line.currentWinner).equal(user.address)
-            expect(line.currentPrice).equal(lastBid)
-            expect(await getContractBalance(auction)).equal(lastBid)
-            expect(await user.getBalance()).approximately(
-                iniBal.sub(lastBid), toWei(0.001)
-            );
-        }
-
-    })
-
-    it('shouldn\'t be able to settle nothing', async () => {
-        const { auction } = await parallelAutoAuction({ })
-        const hacker = await getRandomFundedAccount()
-        await expect(auction.connect(hacker).settleAuction(1)).reverted
+        await auctionsBundle(255)
+        await auctionsBundle(255*2)
+        await auctionsBundle(255*3)
+        expect(await figmata.balanceOf(user.address)).equal(4)
+        expect(await getContractBalance(figmata)).equal(toWei(0.01).mul(4))
+        expect(await getContractBalance(auction)).equal(toWei(0.01).mul(2))
     })
 
 });

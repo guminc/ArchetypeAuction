@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.4;
 
@@ -7,8 +7,7 @@ import "../tokens/MinimalAuctionableNFT.sol";
 
 contract ScatterAuctionFuzzTest is ScatterAuction {
     
-
-    MinimalAuctionableNFT token = new MinimalAuctionableNFT("Test", "TEST");
+    MinimalAuctionableNFT token = new MinimalAuctionableNFT("Test", "TEST", 30);
 
     AuctionState public state = AuctionState(
         address(token),
@@ -27,7 +26,7 @@ contract ScatterAuctionFuzzTest is ScatterAuction {
         state.endTime,
         state.timeBuffer
     ) {
-        token.setMinter(address(this));
+        token.addMinter(address(this));
     }
     
     // Invariant: Contract should be immutable.
@@ -48,6 +47,7 @@ contract ScatterAuctionFuzzTest is ScatterAuction {
             state.timeBuffer
         ));
     }
+    
     
 }
 

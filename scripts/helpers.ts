@@ -6,11 +6,21 @@ import { BigNumber, Contract, ContractTransaction } from 'ethers';
 import { ParallelAutoAuction } from '../typechain-types/contracts/ParallelAutoAuction'
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 import * as RNEA from 'fp-ts/ReadonlyNonEmptyArray'
+import * as A from 'fp-ts/Array'
+import { pipe } from 'fp-ts/lib/function';
 
 /* -- Utility pure functions -- */
 // TODO note that some of those functions are dupes of 
 // scatter-art/ArchetypeERC20/scripts/helpers.ts, so they
 // should get decoupled to an unique module.
+
+export const cartesian = <T,U>(as: T[], bs: U[]) => pipe(
+    as, A.flatMap(a => pipe(
+        bs,
+        A.map(b => [a, b])
+    ))
+);
+
 export const randomAddress = () => `0x${[...Array(40)]
     .map(() => Math.floor(Math.random() * 16).toString(16))
     .join('')}`;
@@ -105,6 +115,9 @@ export const getNextId = async (auction: AutoAuction): Promise<number> => {
 export const getLastTimestamp = async () =>
     (await ethers.provider.getBlock('latest')).timestamp
 
+/**
+ * @returns The ETH balance in `contract`.
+ */
 export const getContractBalance = async (contract: Contract): Promise<BigNumber> =>
     await ethers.provider.getBalance(contract.address)
 
@@ -123,7 +136,7 @@ export const auctionFactory = async ({
 
     const [deployer, ] = await ethers.getSigners()
     
-    const nft = await NftFactory.deploy('TestNft', 'TEST')
+    const nft = await NftFactory.deploy('TestNft', 'TEST', 100)
     const auction = await AuctionFactory.deploy() as AutoAuction
     const bidToken = await TestErc20Factory.connect(deployer).deploy()
     
@@ -140,7 +153,7 @@ export const auctionFactory = async ({
         extraBidTime
     );
 
-    await nft.setMinter(auction.address)
+    await nft.addMinter(auction.address)
 
     return { auction, nft, bidToken }
 }
@@ -151,17 +164,21 @@ export const parallelAutoAuction = async ({
     extraAuctionTime = 3, // 3 seconds
     startingPrice = 0.1, // 0.1 eth
     bidIncrement = 0.05, // 0.05 eth
-    mainnet = false
+    mainnet = false,
+    maxSupply = 100,
 }) => {
-    const AuctionFactory = await ethers.getContractFactory('ParallelAutoAuction');
+    const AuctionFactory = await ethers.getContractFactory('RewardedParallelAuction');
     const NftFactory = await ethers.getContractFactory('MinimalAuctionableNFT')
     const [deployer, ] = await ethers.getSigners()
     
-    const user = mainnet ? undefined : await getRandomFundedAccount()
+    const user = mainnet ? deployer : await getRandomFundedAccount()
 
-    const nft = await NftFactory.connect(deployer).deploy('TestNft', 'TEST')
+    const nft = await NftFactory.connect(deployer).deploy(
+        'TestNft', 'TEST', maxSupply
+    )
 
-    const auction = await AuctionFactory.connect(deployer).deploy(
+    const auction = await AuctionFactory.connect(deployer).deploy()
+    await auction.connect(deployer).initialize(
         nft.address,
         auctionsAtSameTime,
         auctionDuration,
@@ -169,15 +186,12 @@ export const parallelAutoAuction = async ({
         toWei(startingPrice),
         toWei(bidIncrement)
     )
-
-    await nft.connect(deployer).setMinter(auction.address)
+    
+    await nft.connect(deployer).addMinter(auction.address)
 
     return {
         nft, auction, deployer, user
     }
 }
-
-type UnwrapPromise<T> = T extends Promise<infer U> ? U : T;
-export type LineState = UnwrapPromise<ReturnType<ParallelAutoAuction['lineToState']>>
 
 
