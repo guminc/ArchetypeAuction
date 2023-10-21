@@ -38,8 +38,8 @@ const deployment = async () => {
 
     const auction = await FigmataAuctionFactory.connect(deployer).deploy()
     const auctionsAtSameTime = 10
-    const auctionDuration = 3 * 60 // 3 mins.
-    const extraAuctionTime = 30 // 30 secs.
+    const auctionDuration = 80
+    const extraAuctionTime = 15
     const startingPrice = toWei(0)
     const bidIncrement = toWei(0.025)
     

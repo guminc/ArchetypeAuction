@@ -29,7 +29,7 @@ struct Options {
 }
 
 
-contract FigmataAuction is ParallelAutoAuction, ISharesHolder {
+contract AuraAuction is ParallelAutoAuction, ISharesHolder {
 
     mapping(address => uint256) private _rewardTokenShares;
 	mapping(address => bool) private _allowSharesUpdate;

@@ -19,6 +19,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "solady/src/utils/LibString.sol";
 import "../interfaces/IExternallyMintable.sol";
+import "solady/src/utils/SafeTransferLib.sol";
 
 
 /* -------------- *\
@@ -52,7 +53,7 @@ address constant PLATFORM = 0x86B82972282Dd22348374bC63fd21620F7ED847B;
 uint16 constant MAXBPS = 5000; // max fee or discount is 50%
 
 
-contract PixeladyFigmata is ERC721Enumerable, Ownable, IExternallyMintable {
+contract AuraGamma is ERC721Enumerable, Ownable, IExternallyMintable {
 
     Config public config;
     Options public options;
@@ -73,19 +74,19 @@ contract PixeladyFigmata is ERC721Enumerable, Ownable, IExternallyMintable {
         config = _config;
     }
 
-    function withdraw() external {
+    function withdraw() external onlyOwner {
         uint256 platformFee = address(this).balance * config.platformFee / 10000;
 
         // Platform withdrawal
         if (config.altPlatformPayout != address(0)) {
-            payable(PLATFORM).transfer(platformFee / 2);
-            payable(config.altPlatformPayout).transfer(platformFee / 2);
-        } else payable(PLATFORM).transfer(platformFee);
+            SafeTransferLib.forceSafeTransferETH(PLATFORM, platformFee / 2);
+            SafeTransferLib.forceSafeTransferETH(config.altPlatformPayout, platformFee / 2);
+        } else SafeTransferLib.forceSafeTransferETH(PLATFORM, platformFee);
         
         // Collection owner withdrawal
         if (config.ownerAltPayout != address(0))
-            payable(config.ownerAltPayout).transfer(address(this).balance);
-        else payable(owner()).transfer(address(this).balance);
+            SafeTransferLib.forceSafeTransferETH(config.ownerAltPayout, address(this).balance);
+        else SafeTransferLib.forceSafeTransferETH(owner(), address(this).balance);
     }
 
     function getPlatform() external pure returns (address) {
