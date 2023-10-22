@@ -12,12 +12,12 @@ export const figmataIntegrationDeployment = async ({
     ownerAltPayout = ethers.constants.AddressZero,
     superAffiliatePayout = ethers.constants.AddressZero
 }) => {
-    const FigmataAuctionFactory = await ethers.getContractFactory('FigmataAuction')
-    const FigmataFactory = await ethers.getContractFactory('PixeladyFigmata')
+    const FigmataAuctionFactory = await ethers.getContractFactory('AuraAuction')
+    const FigmataFactory = await ethers.getContractFactory('AuraGamma')
     // We deploy a fake ERC721 token to test VIP auctions with `FigmataAuction`.
     const PixeladyFactory = await ethers.getContractFactory('MinimalErc721')
 
-    const [ deployer, ]= await ethers.getSigners()
+    const [ deployer, ] = await ethers.getSigners()
 
     const pixelady = await PixeladyFactory.deploy()
     const pixeladyBc = await PixeladyFactory.deploy()

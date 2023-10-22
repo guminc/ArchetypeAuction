@@ -5,12 +5,13 @@ import "@openzeppelin/hardhat-upgrades";
 
 dotenv.config()
 const privateKey = process.env.PRIVATE_KEY || "";
+const infuraKey = process.env.INFURA_KEY!
 
 const config: HardhatUserConfig = {
     solidity: '0.8.18',
     defaultNetwork: 'hardhat',
     gasReporter: {
-        enabled: true,
+        enabled: false,
         coinmarketcap: process.env.CMC_API_KEY,
         outputFile: 'gasReports'
     },
@@ -22,6 +23,10 @@ const config: HardhatUserConfig = {
             mining: {
                 auto: true,
                 interval: 1000
+            },
+            forking: {
+                enabled: true,
+                url: `https://mainnet.infura.io/v3/${infuraKey}`
             }
         },
         sepolia: {
