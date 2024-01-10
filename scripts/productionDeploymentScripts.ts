@@ -77,7 +77,8 @@ const productionDeployment = async () => {
 
     const [ deployer, ] = await ethers.getSigners()
 
-    const baseUri = 'ipfs://bafybeicnhnsegllke6otkr5zh76whmwn4ms7kw6eaubpugzzjm5znbeyp4/'
+    /*
+    const baseUri = 'ipfs://bafybeigapcj3s2wg3xzreqyjuir3363kcg5ef73yyvjwwah5jvtim7zxw4/'
 
     const conf: ConfigStruct = {
         baseUri,
@@ -113,15 +114,17 @@ const productionDeployment = async () => {
 
     console.log(`AuraGamma address: ${aura.address}`)
     console.log(`Auction address: ${auction.address}`)
+    */
     
     // NOTE This method should only get called instantly before production.
     // The whole front-end should already be integrated with the addresses
     // deployed before.
-    // await figmata.connect(deployer).addMinter(auction.address)
+    const aura = AuraFactory.attach('0xa2185B3A0d8788E007d0c9ca261F154721c2aCEA')
+    await aura.connect(deployer).addMinter('0xe6746a4459051cC4c4948d38E1fA69717eF442f1')
 }
 
 
-const production = false
+const production = true
 
 const deploymentFunction = production 
     ? productionDeployment
@@ -136,3 +139,16 @@ deploymentFunction()
     .then(() => console.log('Successful deployment :D'))
     .catch(e => console.log(`Something went wrong! ${e}`))
 
+// const prodWithdrawalTest = async () => {
+//     const AuraFactory = await ethers.getContractFactory('AuraGamma')
+//     const [ deployer, ] = await ethers.getSigners()
+// 
+//     const aura = AuraFactory.attach('0xa2185B3A0d8788E007d0c9ca261F154721c2aCEA')
+// 	await aura.connect(deployer).withdraw({
+// 		gasPrice: ethers.utils.parseUnits("25", "gwei").toString(),
+// 		type: 1
+// 	})
+// 	
+// }
+// 
+// prodWithdrawalTest().then(() => console.log('DONE!'))

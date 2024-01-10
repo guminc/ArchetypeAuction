@@ -18,7 +18,6 @@ contract RewardedAuction is AutoAuction, ISharesHolder {
 		_rewardTokenShares[msg.sender] += msg.value;
 	}
 	
-	// TODO test msg.sender
 	function getAndClearSharesFor(address user) external returns (uint256 shares) {
 		require(msg.sender == owner() || _allowSharesUpdate[msg.sender]);
 		shares = _rewardTokenShares[user];

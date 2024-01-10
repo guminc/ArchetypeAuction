@@ -1,11 +1,5 @@
+import { toWei } from './scripts/helpers'
 module.exports = [
-    'Pixelady Figmata',
-    'PXLDYFGMTA',
-	{
-		baseUri: 'ipfs://bafybeia4sm7z4kz2zolti6byrgktpkuotxmpots2httddn5i4ffm6ucdba/',
-		maxSupply: 360,
-		platformFee: 500,
-		ownerAltPayout: '0x6a6d59af77e75c5801bad3320729b81e888b5f09',
-		altPlatformPayout: '0x'+'0'.repeat(40)
-	}
+	"0xa2185B3A0d8788E007d0c9ca261F154721c2aCEA",
+	8, 86400, 300, 0, toWei(0.1)
 ]

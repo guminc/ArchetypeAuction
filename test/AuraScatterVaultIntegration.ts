@@ -71,4 +71,10 @@ describe('AuraIntegrations', () => {
         expect(await getContractBalance(auction)).eq(toWei(0.1))
 
     })
+
+	it.only('check selector', async () => {
+        const { auction, user } = await figmataIntegrationDeployment({})
+		const k = await auction.connect(user).testAuctionPaused()	
+		console.log(k)
+	})
 })
