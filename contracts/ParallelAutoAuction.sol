@@ -52,7 +52,7 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
         uint32 timeBuffer,
         uint96 startingPrice,
         uint96 bidIncrement
-    ) external onlyOwner {
+    ) public onlyOwner {
         require(!_stateLocks.initializationLocked); 
         _stateLocks.initializationLocked = true;
 

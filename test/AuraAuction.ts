@@ -33,7 +33,7 @@ describe('AuraAuction', async () => {
         expect(await figmata.isMinter(auction.address)).true
     })
     
-    it('should be able to configure vips', async () => {
+    it.skip('should be able to configure vips', async () => {
         const { 
             auction, deployer,
             pixelady, pixeladyBc, milady, remilio

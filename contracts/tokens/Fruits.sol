@@ -66,7 +66,6 @@ contract Fruits is ERC721Enumerable, Ownable, IExternallyMintable {
         Config memory _config
     ) ERC721(name, symbol) { 
         if(
-            (bytes(_config.baseUri).length == 0) || 
             (_config.maxSupply < 1) ||
             (_config.platformFee > MAXBPS && _config.platformFee < 500)
         ) revert WrongConfiguration();

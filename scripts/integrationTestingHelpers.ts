@@ -12,17 +12,11 @@ export const figmataIntegrationDeployment = async ({
     ownerAltPayout = ethers.constants.AddressZero,
     superAffiliatePayout = ethers.constants.AddressZero
 }) => {
-    const FigmataAuctionFactory = await ethers.getContractFactory('AuraAuction')
-    const FigmataFactory = await ethers.getContractFactory('AuraGamma')
+    const FigmataAuctionFactory = await ethers.getContractFactory('FruitsAuction')
+    const FigmataFactory = await ethers.getContractFactory('Fruits')
     // We deploy a fake ERC721 token to test VIP auctions with `FigmataAuction`.
-    const PixeladyFactory = await ethers.getContractFactory('MinimalErc721')
 
     const [ deployer, ] = await ethers.getSigners()
-
-    const pixelady = await PixeladyFactory.deploy()
-    const pixeladyBc = await PixeladyFactory.deploy()
-    const milady = await PixeladyFactory.deploy()
-    const remilio = await PixeladyFactory.deploy()
 
     const conf: ConfigStruct = {
         baseUri: 'ipfs://fakeUri',
@@ -49,15 +43,11 @@ export const figmataIntegrationDeployment = async ({
         toWei(bidIncrement)
     )
 
-    await auction.connect(deployer).setTokensRequiredToHoldToBeVip([
-        pixelady.address, pixeladyBc.address, milady.address, remilio.address
-    ])
     await figmata.connect(deployer).addMinter(auction.address)
     
     const user = await getRandomFundedAccount()
 
     return {
         deployer, auction, figmata, user,
-        pixelady, pixeladyBc, milady, remilio
     }
 }
