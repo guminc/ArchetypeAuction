@@ -15,7 +15,7 @@ error SharesHolderLocked();
 error NotAMinter(address triedToMint);
 error MaxRewardsExceded();
 
-struct Config {
+struct KagamiConfig {
 	uint256 maxSupply;
     address sharesHolder;
 	bool mintLocked;
@@ -26,7 +26,7 @@ struct Config {
 
 contract Kagami is Ownable, ERC20, IRewardToken {
     
-    Config config;
+    KagamiConfig config;
     mapping (address => bool) private _isRewardsMinter;
 
 	/*****************************************************\

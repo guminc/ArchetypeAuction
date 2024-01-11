@@ -1,53 +1,43 @@
 import { ethers } from "hardhat"
-import { ConfigStruct } from "../typechain-types/contracts/tokens/PixeladyFigmata"
 import { toWei } from "./helpers"
+import { ConfigStruct } from "../typechain-types/contracts/tokens/FruitsMilady"
 
 const preProdTestnetDeployment = async () => {
 
-    const AuraAuctionFactory = await ethers.getContractFactory('AuraAuction')
-    const AuraFactory = await ethers.getContractFactory('AuraGamma')
-    // const NFTFactory = await ethers.getContractFactory('MinimalErc721')
-
     const [ deployer, ] = await ethers.getSigners()
+    const FruitsRemiliaAuctionFactory = await ethers.getContractFactory('FruitsRemiliaAuction')
+    const FruitsMiladyFactory = await ethers.getContractFactory('FruitsMilady')
+    const KagamiTokenFactory = await ethers.getContractFactory('Kagami')
 
-    // We deploy fake ERC721 tokens to test VIP auctions with `FigmataAuction`.
-    // const pixelady = await NFTFactory.deploy()
-    // const pixeladyBc = await NFTFactory.deploy()
-    // const milady = await NFTFactory.deploy()
-    // const remilio = await NFTFactory.deploy()
-    
-    // Deployment to test wallet.
-    // await milady.connect(deployer).mint(
-    //     '0xDFA0B3fCf7B9E6e1BFB8ef536Aa33B5aF6Fd7F47', 13
-    // )
-        
-    // Pixelady URI for testing.
-    const baseUri = 'ipfs://bafybeicnhnsegllke6otkr5zh76whmwn4ms7kw6eaubpugzzjm5znbeyp4'
-    // Who the fuck cares? The test uri should be for the tokens above! I guess?
+
+    /* Fruits Milady Token Deployment */
+    const baseUri = 'TODO' // TODO
 
     const conf: ConfigStruct = {
         baseUri,
-        maxSupply: 88,
+        maxSupply: 6,
         platformFee: 500,
-        ownerAltPayout: '0x6a6d59af77e75c5801bad3320729b81e888b5f09',
+        ownerAltPayout: ethers.constants.AddressZero,
         altPlatformPayout: ethers.constants.AddressZero,
     }
     
-    const aura = await AuraFactory.connect(deployer).deploy(
-        'AURAGAMMA',
-        'GAMMA',
+    const fruitsMilady = await FruitsMiladyFactory.connect(deployer).deploy(
+        'FRUiTS MiLADY',
+        'FRUITSMILADY',
         conf
     )
 
-    const auction = await AuraAuctionFactory.connect(deployer).deploy()
-    const auctionsAtSameTime = 10
-    const auctionDuration = 24 * 60 * 60 // 1 day.
-    const extraAuctionTime = 5 * 60 // 5 mins.
-    const startingPrice = toWei(0)
+
+    /* Auction Integration */
+    const auction = await FruitsRemiliaAuctionFactory.connect(deployer).deploy()
+    const auctionsAtSameTime = 6
+    const auctionDuration = 10 * 60 // 10 mins.
+    const extraAuctionTime = 3 * 60 // 3 mins.
+    const startingPrice = toWei(0.01)
     const bidIncrement = toWei(0.01)
     
     await auction.connect(deployer).initialize(
-        aura.address,
+        fruitsMilady.address,
         auctionsAtSameTime,
         auctionDuration,
         extraAuctionTime,
@@ -55,76 +45,40 @@ const preProdTestnetDeployment = async () => {
         bidIncrement
     )
 
-    // await auction.connect(deployer).setTokensRequiredToHoldToBeVip([
-    //     pixelady.address, pixeladyBc.address, milady.address, remilio.address
-    // ])
 
-    await aura.connect(deployer).addMinter(auction.address)
+    /* Reward Token Integration */
+    const kagami = await KagamiTokenFactory.connect(deployer).deploy('Kagami', 'KAGAMI')
+    await kagami
+        .connect(deployer)
+        .setMaxSupply(toWei(10000))
+        .then(tx => tx.wait())
+    await kagami
+        .connect(deployer)
+        .setSharesHolder(auction.address)
+        .then(tx => tx.wait())
+    await auction
+        .connect(deployer)
+        .addSharesUpdater(kagami.address)
+        .then(tx => tx.wait())
 
-    // const vipIds = [ 
-    //     1, 7, 51, 55, 171, 81, 114, 180, 230, 211, 210, 17, 179, 247, 288, 308, 36, 323
-    // ]
-    // await auction.connect(deployer).setVipIds(vipIds, true)
-    
-    console.log(`AuraGamma address: ${aura.address}`)
+
+    /* Auction start */
+    await fruitsMilady
+        .connect(deployer)
+        .addMinter(auction.address)
+        .then(tx => tx.wait())
+
+    console.log(`FruitsMilady address: ${fruitsMilady.address}`)
     console.log(`Auction address: ${auction.address}`)
+    console.log(`Kagami reward token address: ${kagami.address}`)
 }
 
 const productionDeployment = async () => {
-
-    const AuraAuctionFactory = await ethers.getContractFactory('AuraAuction')
-    const AuraFactory = await ethers.getContractFactory('AuraGamma')
-
-    const [ deployer, ] = await ethers.getSigners()
-
-    /*
-    const baseUri = 'ipfs://bafybeigapcj3s2wg3xzreqyjuir3363kcg5ef73yyvjwwah5jvtim7zxw4/'
-
-    const conf: ConfigStruct = {
-        baseUri,
-        maxSupply: 88,
-        platformFee: 500,
-        ownerAltPayout: '0x179677F33524358E3c146215054a4D27C644B7Fc',
-        altPlatformPayout: ethers.constants.AddressZero,
-    }
-
-    console.log('Deploying AuraGAmma...')
-    const aura = await AuraFactory.connect(deployer).deploy(
-        'AURAGAMMA',
-        'GAMMA',
-        conf
-    )
-
-    const auction = await AuraAuctionFactory.connect(deployer).deploy()
-    const auctionsAtSameTime = 8
-    const auctionDuration = 24 * 60 * 60 // 1 day.
-    const extraAuctionTime = 5 * 60 // 5 mins.
-    const startingPrice = toWei(0)
-    const bidIncrement = toWei(0.01)
-    
-    console.log('Initializing Auction...')
-    await auction.connect(deployer).initialize(
-        aura.address,
-        auctionsAtSameTime,
-        auctionDuration,
-        extraAuctionTime,
-        startingPrice,
-        bidIncrement
-    )
-
-    console.log(`AuraGamma address: ${aura.address}`)
-    console.log(`Auction address: ${auction.address}`)
-    */
-    
-    // NOTE This method should only get called instantly before production.
-    // The whole front-end should already be integrated with the addresses
-    // deployed before.
-    const aura = AuraFactory.attach('0xa2185B3A0d8788E007d0c9ca261F154721c2aCEA')
-    await aura.connect(deployer).addMinter('0xe6746a4459051cC4c4948d38E1fA69717eF442f1')
+    // TODO
 }
 
 
-const production = true
+const production = false
 
 const deploymentFunction = production 
     ? productionDeployment
@@ -138,17 +92,3 @@ console.log(msg)
 deploymentFunction()
     .then(() => console.log('Successful deployment :D'))
     .catch(e => console.log(`Something went wrong! ${e}`))
-
-// const prodWithdrawalTest = async () => {
-//     const AuraFactory = await ethers.getContractFactory('AuraGamma')
-//     const [ deployer, ] = await ethers.getSigners()
-// 
-//     const aura = AuraFactory.attach('0xa2185B3A0d8788E007d0c9ca261F154721c2aCEA')
-// 	await aura.connect(deployer).withdraw({
-// 		gasPrice: ethers.utils.parseUnits("25", "gwei").toString(),
-// 		type: 1
-// 	})
-// 	
-// }
-// 
-// prodWithdrawalTest().then(() => console.log('DONE!'))

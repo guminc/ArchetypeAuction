@@ -1,6 +1,6 @@
 import { ethers } from "hardhat";
-import { ConfigStruct } from "../typechain-types/contracts/tokens/PixeladyFigmata";
 import { getRandomFundedAccount, toWei } from "./helpers";
+import { ConfigStruct } from "../typechain-types/contracts/tokens/FruitsMilady";
 
 export const figmataIntegrationDeployment = async ({
     auctionsAtSameTime = 10,
@@ -12,9 +12,8 @@ export const figmataIntegrationDeployment = async ({
     ownerAltPayout = ethers.constants.AddressZero,
     superAffiliatePayout = ethers.constants.AddressZero
 }) => {
-    const FigmataAuctionFactory = await ethers.getContractFactory('FruitsAuction')
-    const FigmataFactory = await ethers.getContractFactory('Fruits')
-    // We deploy a fake ERC721 token to test VIP auctions with `FigmataAuction`.
+    const FigmataAuctionFactory = await ethers.getContractFactory('FruitsRemiliaAuction')
+    const FigmataFactory = await ethers.getContractFactory('FruitsMilady')
 
     const [ deployer, ] = await ethers.getSigners()
 

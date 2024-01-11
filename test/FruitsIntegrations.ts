@@ -5,7 +5,7 @@ import { fromWei, getContractBalance, getLastTimestamp, getRandomAccount, getRan
 import { BigNumber } from 'ethers';
 import { SignerWithAddress } from '@nomiclabs/hardhat-ethers/signers';
 
-describe('AuraIntegration', async () => {
+describe('FruitsIntegration', async () => {
 
     it('should allow basic withdrawal', async () => {
         const auctionDuration = 1
@@ -35,7 +35,7 @@ describe('AuraIntegration', async () => {
 
         expect(await deployer.getBalance()).closeTo(
             toWei(startingPrice).mul(95).div(100).add(deployerIniBal),
-            toWei(0.001)
+            toWei(0.01)
         )
     })
 

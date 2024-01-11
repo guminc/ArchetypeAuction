@@ -170,9 +170,9 @@ contract ParallelAutoAuction is IParallelAutoAuction, Ownable {
         return _auctionConfig.auctionedNft;
     }
     
-    // TODO it should revert if `tokenId != expectedHead`
+    // TODO should it revert if `tokenId != expectedHead`?
     function getMinPriceFor(uint24 tokenId) external view returns (uint96) {
-        uint8 lineNumber = uint8(tokenId % _auctionConfig.lines);
+        uint8 lineNumber = tokenIdToLineNumber(tokenId);
         LineState memory line = _lineToState[lineNumber];
         if (block.timestamp > line.endTime) return _auctionConfig.startingPrice;
         else return line.currentPrice + _auctionConfig.bidIncrement;
