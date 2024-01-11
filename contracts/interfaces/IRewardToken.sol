@@ -30,4 +30,10 @@ interface IRewardToken is IERC20 {
      * the allowed amount to mint.
      */
     function supplyLeft() external view returns (uint256);
+
+
+    /**
+     * @dev Simple auctioncore integration.
+     */
+    function claimShares() external;
 }

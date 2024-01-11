@@ -53,7 +53,7 @@ address constant PLATFORM = 0x86B82972282Dd22348374bC63fd21620F7ED847B;
 uint16 constant MAXBPS = 5000; // max fee or discount is 50%
 
 
-contract Fruits is ERC721Enumerable, Ownable, IExternallyMintable {
+contract FruitsMilady is ERC721Enumerable, Ownable, IExternallyMintable {
 
     Config public config;
     Options public options;

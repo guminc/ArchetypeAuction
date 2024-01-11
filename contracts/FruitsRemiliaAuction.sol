@@ -18,7 +18,7 @@ pragma solidity ^0.8.4;
 import "./ParallelAutoAuction.sol";
 import "./interfaces/ISharesHolder.sol";
 
-contract FruitsAuction is ParallelAutoAuction, ISharesHolder {
+contract FruitsRemiliaAuction is ParallelAutoAuction, ISharesHolder {
 
     /**
      * @dev Amount of rewarded shares per bid.

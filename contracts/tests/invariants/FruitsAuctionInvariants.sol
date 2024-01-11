@@ -2,16 +2,16 @@
 
 pragma solidity ^0.8.4;
 
-import "../../FruitsAuction.sol";
-import "../../tokens/Fruits.sol";
+import "../../FruitsRemiliaAuction.sol";
+import "../../tokens/FruitsMilady.sol";
 import "./Account.sol";
 import "solady/src/utils/SafeTransferLib.sol";
 
 contract FruitsAuctionInvariants {
 
-    Fruits private _token;
+    FruitsMilady private _token;
     Config private _tokenConfig;
-    FruitsAuction private _auction;
+    FruitsRemiliaAuction private _auction;
 
     uint96 private _startingPrice = 0.1 ether;
     uint96 private _bidIncrement = 0.1 ether;
@@ -26,9 +26,9 @@ contract FruitsAuctionInvariants {
 
     constructor() {
         _tokenConfig = Config("", address(0), address(0), _maxId, 500);
-        _token = new Fruits("Token", "TOKEN", _tokenConfig);
+        _token = new FruitsMilady("FRUiTS MiLADY", "FRUITSMILADY", _tokenConfig);
 
-        _auction = new FruitsAuction();
+        _auction = new FruitsRemiliaAuction();
 
         _auction.initialize(address(_token), _maxId, 86400, 900, _startingPrice, _bidIncrement);
         _auction.setSharesPerBid(_sharesPerBid);

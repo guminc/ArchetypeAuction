@@ -24,7 +24,7 @@ struct Config {
     bool sharesHolderLocked;
 }
 
-contract ArchetypeERC20 is Ownable, ERC20, IRewardToken {
+contract Kagami is Ownable, ERC20, IRewardToken {
     
     Config config;
     mapping (address => bool) private _isRewardsMinter;
@@ -34,7 +34,7 @@ contract ArchetypeERC20 is Ownable, ERC20, IRewardToken {
 	\*****************************************************/
 	constructor(string memory name, string memory symbol) ERC20(name, symbol) {}
 
-	function setMaxSupply(uint256 maxSupply) public onlyOwner {
+	function setMaxSupply(uint256 maxSupply) external onlyOwner {
         if (config.maxSupplyLocked) revert MaxSupplyLocked();
         require(maxSupply >= totalSupply(), "Max supply can't be below current supply");
 		config.maxSupply = maxSupply;
@@ -48,10 +48,25 @@ contract ArchetypeERC20 is Ownable, ERC20, IRewardToken {
 		super._mint(account, amount);
 	}
 
-	function ownerMint(address account, uint256 amount) public onlyOwner {
+	function ownerMint(address account, uint256 amount) external onlyOwner {
 		if (config.ownerMintLocked) revert OwnerMintLocked();
         _mint(account, amount);
 	}
+
+    function ownerMint(address[] memory accounts, uint256 amount) external onlyOwner {
+		if (config.ownerMintLocked) revert OwnerMintLocked();
+		if (config.mintLocked) revert MintLocked();
+        for (uint256 i = 0; i < accounts.length; i++)
+            super._mint(accounts[i], amount);
+    }
+
+    function ownerMint(address[] memory accounts, uint256[] memory amounts) external onlyOwner {
+		if (config.ownerMintLocked) revert OwnerMintLocked();
+		if (config.mintLocked) revert MintLocked();
+        require(accounts.length == amounts.length, "Wrong accounts/amounts sizes");
+        for (uint256 i = 0; i < accounts.length; i++)
+            super._mint(accounts[i], amounts[i]);
+    }
 
 	/*******************************\
 	|* IRewardToken implementation *|
@@ -62,7 +77,7 @@ contract ArchetypeERC20 is Ownable, ERC20, IRewardToken {
         _mint(account, amount);
     }
 
-    function isRewardsMinter(address minter) public view returns (bool) {
+    function isRewardsMinter(address minter) external view returns (bool) {
         return _isRewardsMinter[minter];
     }
 
